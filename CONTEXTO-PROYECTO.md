@@ -2,21 +2,23 @@
 
 > Documento de contexto autocontenido para entregar a otra IA / desarrollador.
 > Resume arquitectura, decisiones, funcionalidades y estado del repositorio.
-> Última actualización: julio 2026.
+> Última actualización: julio 2026 (tras integrar en `master`: cuestionarios/escalas,
+> adjuntos en comentarios, citas psicológicas + horarios, y recordatorios por rol).
 
 ---
 
 ## 1. Resumen ejecutivo
 
 **SafePoint** es una plataforma web de **acompañamiento psicológico y clima
-laboral**. Administradores y moderadores gestionan proyectos, módulos de
-entrenamiento y contenidos (videos, imágenes, documentos, audios, reuniones,
-evaluaciones); los usuarios consumen el contenido publicado en un **feed estilo
-red social** (con me gusta y comentarios) y responden **cuestionarios/escalas
-psicométricas** que se les asignan.
+laboral**. Administradores y moderadores (psicólogos) gestionan proyectos, módulos
+de entrenamiento y contenidos (videos, imágenes, documentos, audios, reuniones);
+los usuarios consumen el contenido publicado en un **feed estilo red social** (con
+me gusta, comentarios y **adjuntos**), responden **cuestionarios/escalas
+psicométricas** que se les asignan, **agendan citas psicológicas** y participan en
+**charlas**. Cada rol ve **recordatorios/notificaciones** adaptados a su función.
 
 El control de acceso es por **roles y permisos (RBAC)** con tres roles:
-Administrador, Moderador y Usuario.
+Administrador, Moderador (psicólogo) y Usuario.
 
 ---
 
@@ -29,11 +31,14 @@ Administrador, Moderador y Usuario.
 | Base de datos | **MySQL**, BD `psicologia` |
 | Entorno | **Laragon** en Windows (shell: PowerShell / Git Bash) |
 | Auth/RBAC | **spatie/laravel-permission 8** |
-| UI reactiva | **Livewire 4** (tablas de usuarios/roles, confirmaciones) |
-| Multimedia | **spatie/laravel-package-tools** + `james-heinrich/getid3` (metadatos audio); storage local (`storage:link`) |
+| UI reactiva | **Livewire 4** (usuarios/roles, gestión de charla, horarios, agendar cita) |
+| Multimedia | `james-heinrich/getid3` (metadatos audio); storage local (`storage:link`) |
 | Gráficos | **Chart.js 4** por CDN (diagramas radar de cuestionarios) |
+| Calendario | **flatpickr 4.6** por CDN (agendar cita: bloquea domingos y feriados) |
+| Videollamada | Enlaces **Jitsi** autogenerados (`https://meet.jit.si/SafePoint-Cita-…`) |
+| Correo | `Mail::to()->send()` (confirmación de cita, best-effort en try/catch) |
 | Frontend | **Bootstrap 5.3 + Bootstrap Icons por CDN** (sin build) |
-| Estilos propios | `public/css/corporate.css` |
+| Estilos propios | `public/css/corporate.css` (con cache-busting `?v=filemtime`) |
 | i18n | ES/EN con `__()` + `lang/en.json` |
 | Tooling | Pint (formato). Vite+Tailwind presentes pero **no usados** en las vistas |
 
@@ -65,18 +70,21 @@ Administrador, Moderador y Usuario.
   *Administrador / Moderador / Usuario*). Se conservó la columna extra `activo`.
 - `config/permission.php`: `models.role = Rol::class`, `table_names.roles = 'rols'`,
   `column_names.role_pivot_key = 'rol_id'`.
-- El pivot `role_user` se reemplazó por las tablas de Spatie.
 - `App\Models\User` usa el trait `HasRoles`; helpers `esGestor()` (Admin/Moderador),
-  `proyectoIds()`, `puedeVerContenido()`.
+  `proyectoIds()`, `puedeVerContenido()`, `moderador()`, `citas()`, `charlas()`,
+  `citasProximas()`, `proximaCharla()`, `recordatorios()`.
 
 ### Roles y permisos
-
-- **48 permisos** `{recurso}.{accion}` sobre 12 recursos (`usuarios, roles,
-  proyectos, modulos, contenidos, cuestionarios, reuniones, documentos, videos,
-  imagenes, evaluaciones, citas`) × (`ver, crear, editar, eliminar`).
+- Permisos `{recurso}.{accion}` × (`ver, crear, editar, eliminar`). Recursos:
+  `usuarios, roles, proyectos, modulos, contenidos, cuestionarios, reuniones,
+  documentos, videos, imagenes, evaluaciones, citas, charlas, feriados, psicologos`.
 - **Administrador es super-admin** vía `Gate::before()` en `AppServiceProvider`.
+- **Moderador (psicólogo):** gestiona contenido/módulos/cuestionarios/**charlas** y
+  `citas.ver/editar` (atiende citas, no agenda).
+- **Usuario (paciente):** `.ver` de consulta + `citas.crear` (agenda sus citas).
 - Middleware en `bootstrap/app.php`: `role`, `permission`, `role_or_permission`.
-  Uso: `->middleware('permission:contenidos.crear')`.
+- **Nota:** el subsistema *evaluaciones* existe en BD/permisos pero se **quitó de la
+  UI** por ser redundante con *cuestionarios* (decisión de producto).
 
 ---
 
@@ -84,147 +92,208 @@ Administrador, Moderador y Usuario.
 
 **Jerarquía de contenido**
 - **Proyecto** → muchos **Módulos**; pivote `proyecto_user` (miembros del proyecto).
-- **ModuloEntrenamiento** (`modulos_entrenamiento`) → pertenece a Proyecto; muchos
-  **Contenidos**; campo `publicado`.
-- **Contenido** (`contenidos`) → pertenece a un Módulo. `tipo` (enum: `video,
-  documento, imagen, reunion, evaluacion, audio`), `publicado`, `publicar_en`
-  (publicación programada). Relaciones `hasMany` → **Video/Imagen/Documento/Audio**;
-  `hasOne` → **Reunion/EvaluacionPsicologica**.
-- **Like** y **Comentario** → interacción del feed (pertenecen a Contenido + User).
+- **ModuloEntrenamiento** (`modulos_entrenamiento`) → pertenece a Proyecto; `publicado`.
+- **Contenido** (`contenidos`) → pertenece a un Módulo. `tipo` (`video, documento,
+  imagen, reunion, evaluacion, audio`), `publicado`, `publicar_en` (programada).
+  `hasMany` → Video/Imagen/Documento/Audio; `hasOne` → Reunion/EvaluacionPsicologica.
+- **Like** y **Comentario** → interacción del feed. **Comentario** ahora soporta
+  **adjunto** (`adjunto_url`, `adjunto_nombre`; `cuerpo` nullable → permite adjunto solo).
 
-**Alcance por proyecto:** el feed y el dashboard del Usuario se filtran por los
-proyectos a los que pertenece (`proyecto_user`). Admin/Moderador (`esGestor`) ven todo.
+**Alcance por proyecto:** feed y dashboard del Usuario se filtran por sus proyectos
+(`proyecto_user`). Admin/Moderador (`esGestor`) ven todo.
 
-**Cuestionarios / escalas psicométricas**
-- **Cuestionario** (`cuestionarios`): `titulo`, `descripcion`, `tipo` (nullable,
-  clave en `config/cuestionarios.php`), `modulo_id` (nullable), `activo`.
-- **PreguntaCuestionario** (`preguntas_cuestionario`): `enunciado`, `orden`,
-  `dimension`, `invertida` (ítem inverso).
-- **CuestionarioAsignacion** (`cuestionario_asignaciones`): un gestor habilita un
-  cuestionario a un `user`; `estado` (pendiente/completado), `es_directivo`
-  (trabajador/directivo, para NOSACQ), `completado_at`.
-- **CuestionarioRespuesta** (`cuestionario_respuestas`): `valor` Likert por pregunta.
+**Cuestionarios / escalas** — ver sección 7.
 
-**Otros:** Moderador (perfil de un User), Cita, Cuestionario de quiz heredado, etc.
+**Citas psicológicas** (agendamiento)
+- **Cita** (`citas`): `user_id`, `moderador_id`, `modalidad` (`presencial|virtual`),
+  `fecha`, `hora`, `hora_fin`, datos del paciente (`paciente_nombre/contacto/email`),
+  `tipo` (`primera_vez|seguimiento`), `motivo`, `enlace_virtual`, `estado`
+  (`pendiente|confirmada|cancelada|completada`). Métodos: `esVirtual()`, `inicio()`,
+  `puedeCancelar()` (respeta anticipación mínima configurable).
+- **Feriado** (`feriados`): `fecha` (unique), `nombre`. **CRUD, no hardcodeado**
+  (seeder con feriados Perú 2026). Bloquea el agendamiento en esas fechas.
+- **Horario** (`horarios`): `moderador_id`, `dia` (1-6 ISO), `modalidad`,
+  `hora_inicio`, `hora_fin`. Disponibilidad por psicólogo.
+- **Moderador** = perfil de un User (psicólogo). Añadidos: `foto`, relación
+  `horarios()`, `crearHorarioPorDefecto()` (siembra 6 días × 2 modalidades desde config).
+
+**Charlas**
+- **Charla** (`charlas`): `titulo`, `descripcion`, `fecha` (datetime), `estado`
+  (`pendiente|finalizada`), `foto` (evidencia), `creado_por`. Pivote `charla_user`
+  con `asistio`. `estaFinalizada()`.
 
 ---
 
 ## 6. Funcionalidades (todas en `master`)
 
-1. **Login** Bootstrap split-screen + credenciales demo. Redirección post-login:
-   Usuario → **feed**; Moderador/Admin → **dashboard**.
+1. **Login** Bootstrap split-screen + credenciales demo. Post-login: Usuario → feed;
+   Moderador/Admin → dashboard.
 2. **Navigation drawer** (sidebar) filtrado por permiso; el filtro acepta permiso
-   `null`, string (`can`) o **Closure** (condición dinámica).
-3. **Dashboard** role-aware: gestores ven permisos; usuarios ven su **progreso**
-   de contenido (por proyecto).
-4. **Proyectos** — CRUD + gestión de sus **módulos** + **miembros** (`proyecto_user`).
-5. **Módulos** — CRUD, publicar/despublicar, gestión de sus **contenidos**.
-6. **Contenidos** — creación **por tipo** (crea su recurso relacionado en
-   transacción; soporta **subida de multimedia al storage** o URL), editar,
-   eliminar, publicar; **publicación programada** (`publicar_en`), buscador.
-7. **Feed** estilo red social — contenido **vigente** (publicado o programado ya
-   cumplido) y del alcance del usuario; **me gusta** y **comentarios** reales.
-8. **Usuarios / Roles y permisos** — gestión con **tablas Livewire** reactivas.
-9. **i18n ES/EN** — selector de idioma; `SetLocale` (usuario > sesión > default);
-   `POST /idioma/{locale}`; textos con `__()` y `lang/en.json`.
-10. **Cuestionarios / escalas** — ver sección 7.
+   `null`, string (`can`) o **Closure** (condición dinámica). Grupos: Principal,
+   Gestión, Contenido y seguimiento, Agendamiento.
+3. **Dashboard** role-aware: gestores ven permisos; usuarios ven su **progreso** de
+   contenido. **Franja de recordatorios** arriba (ver sección 10). "Agendar cita"
+   solo para pacientes.
+4. **Proyectos / Módulos / Contenidos** — CRUD, miembros, publicar, multimedia al
+   storage, publicación programada (`publicar_en`), buscador.
+5. **Feed** estilo red social — contenido vigente + del alcance del usuario; **me
+   gusta**, **comentarios con adjuntos**, y **charlas** (finalizadas con foto =
+   registro; programadas = anuncio con ancla `#charla-ID`). Gestores ven todas las
+   charlas con pie de gestión.
+6. **Usuarios / Roles y permisos** — tablas Livewire reactivas.
+7. **i18n ES/EN** — `SetLocale` (usuario > sesión > default); textos con `__()`.
+   ⚠️ Evitar `trans_choice` (aplica fallback a EN); usar `__()` con ternario para plurales.
+8. **Cuestionarios / escalas** — sección 7.
+9. **Citas psicológicas + horarios** — sección 8.
+10. **Charlas** — sección 9.
+11. **Recordatorios / notificaciones por rol** — sección 10.
 
 ### Seeders (`DatabaseSeeder`, en orden)
-`RolSeeder`, `PermissionSeeder`, `UserSeeder`, `ModeradorSeeder`, `ProyectoSeeder`,
-`ContenidoDemoSeeder`, `CuestionarioDass21Seeder`, `CuestionarioNosacq50Seeder`,
-`Nosacq50RespuestasDemoSeeder`.
+`RolSeeder`, `PermissionSeeder`, `UserSeeder`, `ModeradorSeeder`,
+`PsicologoDemoSeeder`, `HorarioDefectoSeeder`, `ProyectoSeeder`, `ContenidoDemoSeeder`,
+`CuestionarioDass21Seeder`, `CuestionarioNosacq50Seeder`, `Nosacq50RespuestasDemoSeeder`,
+`FeriadoSeeder`. (No hay `CharlaSeeder`: las charlas se crean desde la UI.)
 
 ### Usuarios demo (contraseña: `password`)
 | Email | Rol |
 |---|---|
 | `admin@psicologia.test` | Administrador |
-| `moderador@psicologia.test` | Moderador |
+| `moderador@psicologia.test` | Moderador (psicólogo) |
 | `usuario@psicologia.test` | Usuario |
 
 ---
 
 ## 7. Módulo de Cuestionarios / escalas psicométricas
 
-Se **repurposó** la sección "Cuestionarios" (tablas heredadas de quiz) para
-**escalas psicométricas** de puntaje continuo.
-
-**Calificación config-driven** (`config/cuestionarios.php` por `tipo`) +
-`App\Services\CalificadorCuestionario`:
+Escalas de puntaje continuo, **config-driven** (`config/cuestionarios.php` por `tipo`)
++ `App\Services\CalificadorCuestionario`:
 - `metodo`: `suma` (subpuntaje = suma × `factor`) o `promedio` (media de ítems).
-- Ítems `invertida` se puntúan al revés dentro de la escala (`min+max - valor`).
-- Nivel por dimensión con `bandas` (primer `hasta` no superado; `null` = tope).
+- Ítems `invertida` se puntúan al revés (`min+max - valor`).
+- Nivel por dimensión con `bandas`.
 
 **Escalas incluidas**
-- **DASS-21** — escala 0-3, `metodo` suma (×2), 3 dimensiones
-  (depresión/ansiedad/estrés), niveles Normal → Extremadamente severo.
-- **NOSACQ-50** — escala 1-4, `metodo` promedio, **7 dimensiones** de clima de
-  seguridad, **21 ítems inversos**, niveles Bajo/Med. bajo/Med. bueno/Bueno.
-  `requiere_puesto` → pide "¿tiene puesto directivo?" para separar Trabajadores/Directivos.
+- **DASS-21** — escala 0-3, suma (×2), 3 dimensiones (depresión/ansiedad/estrés).
+- **NOSACQ-50** — escala 1-4, promedio, **7 dimensiones**, **21 ítems inversos**;
+  `requiere_puesto` separa Trabajadores/Directivos.
 
-**Flujo**
-1. Admin/Moderador (`cuestionarios.crear`): en `/cuestionarios/{id}` **asigna** el
-   cuestionario a un usuario y ve el estado de cada asignación.
-2. Usuario: **"Mis cuestionarios"** (solo visible para no-gestores) → responde el
-   formulario Likert; las respuestas se guardan y la asignación pasa a completada.
-3. Admin: **revisa respuestas** (`/cuestionarios/asignaciones/{id}`) y ve los
-   **resultados calculados** por dimensión.
-4. **Resultados y diagramas** (`/cuestionarios/{id}/resultados`):
-   `App\Services\ResultadosCuestionario` agrega la **media por dimensión** de todas
-   las respuestas completadas (Todos / Trabajadores / Directivos). La vista muestra
-   **diagramas radar (Chart.js)** — Diagrama 1 (todos), Diagrama 2 (trabajadores vs
-   directivos) — y la **tabla de resultados por dimensión** con su nivel.
+**Flujo:** gestor asigna en `/cuestionarios/{id}` → Usuario responde en
+**"Mis cuestionarios"** (solo no-gestores) → Admin revisa respuestas y ve
+**resultados por dimensión** en `/cuestionarios/{id}/resultados` con **diagramas
+radar (Chart.js)** (Diagrama 1 Todos; Diagrama 2 Trabajadores vs Directivos) +
+tabla de niveles. `App\Services\ResultadosCuestionario` agrega la media por dimensión.
 
-**Para agregar más escalas del mismo tipo:** crear el `Cuestionario` con ese `tipo`
-+ un `tipo` en `config/cuestionarios.php` + un seeder con las preguntas etiquetadas
-por `dimension` (e `invertida` si aplica).
+**Añadir escala:** `Cuestionario` con ese `tipo` + entrada en
+`config/cuestionarios.php` + seeder de preguntas etiquetadas por `dimension`/`invertida`.
 
 ---
 
-## 8. Estado del repositorio y flujo de trabajo
+## 8. Módulo de Citas psicológicas + horarios
+
+**Agendar** (`App\Livewire\AgendarCita`, wizard): modalidad (presencial/virtual) →
+psicólogo → **fecha** (flatpickr, bloquea domingos y feriados) → **cupo de 30 min** →
+datos del paciente → **confirmación**. Genera **enlace Jitsi** si es virtual y envía
+**correo de confirmación**. `DB::transaction` con `lockForUpdate` → **sin doble reserva**.
+
+**Disponibilidad** (`App\Services\AgendaCitas`): calcula bloques según el **Horario**
+del psicólogo por día/modalidad (fallback a `config/citas.php` si no definió horario).
+`config/citas.php`: `sesion_minutos=30`, `cancelacion_horas_min=24`, modalidades con
+horario por defecto (presencial 12:00-15:00, virtual 13:00-15:00).
+
+**Paneles**
+- Usuario: **Mis citas** (ver/cancelar, respeta política de cancelación).
+- Psicólogo: **Mi horario** (`App\Livewire\GestionHorario`, define su disponibilidad;
+  se precargan 12 bloques por defecto editables).
+- Admin/Moderador: **Gestión de citas** (estado), CRUD de **Psicólogos** (con botón
+  Horarios) y **Feriados** (tabla).
+
+---
+
+## 9. Módulo de Charlas
+
+- CRUD de charlas + **asistencia** (`charla_user.asistio`) vía Livewire
+  `App\Livewire\GestionCharla` en `/charlas/{id}` (`charlas.show`).
+- Flujo: agregar asistentes → **finalizar** → subir **foto de evidencia**.
+- **En el feed**: charlas **finalizadas con foto** (registro con asistencia) y
+  charlas **programadas a futuro** (anuncio). Cada tarjeta tiene ancla `#charla-ID`
+  (los recordatorios enlazan a ella con realce `:target`). Gestores ven **todas** las
+  charlas con pie de gestión (N inscritos + Gestionar).
+
+> ⚠️ **Convención de foto** (charla) y adjuntos: se guardan como **ruta relativa**
+> `/storage/...` (con `parse_url(..., PHP_URL_PATH)`), no absoluta, para que la imagen
+> resuelva sin importar el host/puerto. El **borrado** (`GestionCharla` y
+> `CharlaController::eliminarFoto`) usa el mismo prefijo `/storage/`. Los contenidos
+> (videos/imágenes/documentos) **sí** siguen usando URL absoluta (coherente aparte).
+
+---
+
+## 10. Recordatorios / notificaciones por rol
+
+`App\Services\Recordatorios::para(User)` construye una lista homogénea de
+recordatorios según el rol, renderizada por `resources/views/partials/recordatorio.blade.php`
+en **dos lugares**: la **franja del panel** (dashboard) y la **campanita** de la
+topbar (`<x-recordatorios-bell>`, visible en Feed / Contenidos / Mis cuestionarios / Mis citas).
+
+- **Usuario (paciente):** **todas** sus citas próximas + su próxima charla.
+- **Psicólogo (Moderador):** próxima cita que atenderá (con paciente) + agenda de hoy.
+- **Administrador:** citas por confirmar + próxima charla del sistema.
+
+Cada ítem: icono, color (naranja=cita, índigo=charla), título, líneas y acciones
+(p. ej. *Unirse* si la cita virtual está por comenzar, *Ver mis citas*, *Ver en el feed*).
+
+---
+
+## 11. Estado del repositorio y flujo de trabajo
 
 ### Regla de git (importante)
 - **NO se trabaja sobre `master` directamente.** Cada funcionalidad va en su rama
   `feat/...` y se **consulta al dueño antes de hacer `git push`**.
-- Los PRs se mergean en GitHub; luego se sincroniza con
-  `git pull --ff-only origin master` (+ `composer install`, `php artisan migrate`,
-  `php artisan storage:link` cuando aplica).
-- `gh` CLI **no** está instalado; tras el push se usa el enlace
-  `.../pull/new/<rama>`.
+- `gh` CLI **no** está instalado; los PRs se crean con el enlace de "compare".
+- Tras sincronizar: `composer install`, `php artisan migrate`,
+  `php artisan storage:link`, `php artisan optimize:clear`.
 
 ### Estado actual
-- `master`: al día con `origin`, contiene todo lo de la sección 6.
-- Rama abierta: **`feat/cuestionarios-dass21`** (DASS-21 + NOSACQ-50 + diagramas),
-  ya subida a `origin` (PR pendiente de crear/revisar).
+- `master` (`origin`) al día, contiene **todo** lo de las secciones 6–10:
+  cuestionarios/escalas, adjuntos en comentarios, citas + horarios, charlas en el
+  feed, recordatorios por rol, y los fixes de foto de charla (guardado y borrado
+  con ruta relativa).
+- Ramas de esas features **mergeadas y borradas** (repo limpio).
+
+### Repo de documentación
+- Este archivo `docs/CONTEXTO-PROYECTO.md` **no** se versiona en el repo del proyecto;
+  vive en el git personal **`github.com/atestertesting/docs.git`**.
 
 ---
 
-## 9. Cómo levantar el proyecto
+## 12. Cómo levantar el proyecto
 
 ```bash
 composer install                    # incluye Livewire y getid3
 cp .env.example .env                # DB_DATABASE=psicologia, MySQL 127.0.0.1:3306, root
 php artisan key:generate
 php artisan migrate:fresh --seed
-php artisan storage:link            # multimedia subida al storage
+php artisan storage:link            # multimedia/fotos/adjuntos al storage
 php artisan serve                   # http://127.0.0.1:8000
 ```
 
-- No requiere `npm` para la UI (Bootstrap y Chart.js por CDN).
-- Tras cambiar de rama o mergear: `php artisan config:clear && php artisan migrate`.
+- No requiere `npm` para la UI (Bootstrap, Chart.js, flatpickr por CDN).
+- Tras cambiar de rama o mergear: `php artisan optimize:clear && php artisan migrate`.
 
 ---
 
-## 10. Convenciones para seguir desarrollando
+## 13. Convenciones para seguir desarrollando
 
 - Respetar la **paleta corporativa** y reusar las clases de `corporate.css`.
-- Vistas Blade con Bootstrap (CDN), iconos `bi-*`, textos en español envueltos en
-  `__()` (y añadir la clave a `lang/en.json`).
-- Proteger rutas con `permission:{recurso}.{accion}`; Administrador omite los checks
-  (`Gate::before`). Para "gestión" de cuestionarios se usa `cuestionarios.crear`
-  (excluye al rol Usuario, que sí tiene `.ver`).
-- Validación en controladores; operaciones multi-tabla en **transacción**.
+- Vistas Blade con Bootstrap (CDN), iconos `bi-*`, textos en español en `__()`
+  (añadir la clave a `lang/en.json`). **No usar `trans_choice`** (fallback a EN):
+  usar `__()` con ternario singular/plural.
+- Proteger rutas con `permission:{recurso}.{accion}`; Administrador omite checks
+  (`Gate::before`). Para "gestión" de cuestionarios se usa `cuestionarios.crear`.
+- Archivos subidos por usuarios (foto de charla, adjuntos de comentario): guardar
+  **URL relativa** `/storage/...` y borrar con el mismo prefijo.
+- Validación en controladores; operaciones multi-tabla y agendamiento en **transacción**
+  (`lockForUpdate` para evitar doble reserva).
 - Formatear con **Pint** antes de cerrar (`vendor/bin/pint <archivos>`).
-- Verificar en servidor real (login + flujo) antes de dar por terminado.
+- Verificar en servidor real (login + flujo por rol) antes de dar por terminado.
 - Posibles siguientes pasos: Cronbach's Alpha y filtros por sector del NOSACQ,
-  editar/eliminar cuestionarios y preguntas desde la UI, exportar resultados (PDF/CSV),
-  agenda de citas, evaluaciones psicológicas interactivas.
+  editar/eliminar cuestionarios desde la UI, exportar resultados (PDF/CSV),
+  notificaciones por correo/push más completas, recordatorios reactivos (Livewire).
