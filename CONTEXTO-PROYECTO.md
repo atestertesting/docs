@@ -2,8 +2,12 @@
 
 > Documento de contexto autocontenido para entregar a otra IA / desarrollador.
 > Resume arquitectura, decisiones, funcionalidades y estado del repositorio.
-> Última actualización: julio 2026 (tras integrar en `master`: cuestionarios/escalas,
-> adjuntos en comentarios, citas psicológicas + horarios, y recordatorios por rol).
+> Última actualización: julio 2026. **En `master`:** cuestionarios/escalas, adjuntos
+> en comentarios, citas psicológicas + horarios, y recordatorios por rol. **Pendientes
+> de PR** (cada una en su rama `feat/…` + integradas en la rama local `integracion/local`):
+> gestión de **pacientes** + carga masiva Excel, **dashboard ejecutivo de progreso**,
+> **asignación masiva** de cuestionarios, **alcance de citas por psicólogo**, y
+> **tema claro/oscuro** con la nueva **paleta "Sereno"** (azul + celeste). Ver sección 11.
 
 ---
 
@@ -33,6 +37,7 @@ Administrador, Moderador (psicólogo) y Usuario.
 | Auth/RBAC | **spatie/laravel-permission 8** |
 | UI reactiva | **Livewire 4** (usuarios/roles, gestión de charla, horarios, agendar cita) |
 | Multimedia | `james-heinrich/getid3` (metadatos audio); storage local (`storage:link`) |
+| Importación | **phpoffice/phpspreadsheet 5.8** (carga masiva de pacientes `.xlsx`/CSV) — **requiere `ext-zip`** en PHP |
 | Gráficos | **Chart.js 4** por CDN (diagramas radar de cuestionarios) |
 | Calendario | **flatpickr 4.6** por CDN (agendar cita: bloquea domingos y feriados) |
 | Videollamada | Enlaces **Jitsi** autogenerados (`https://meet.jit.si/SafePoint-Cita-…`) |
@@ -52,12 +57,23 @@ Administrador, Moderador (psicólogo) y Usuario.
 ## 3. Identidad visual (obligatoria)
 
 - Nombre de la app en toda la UI: **SafePoint**.
-- Paleta corporativa (solo estos 3 colores):
+- Paleta corporativa **actualizada — paleta "Sereno" (azul + celeste)**:
   - Blanco `#ffffff`
-  - Indigo `#232762` (primario: sidebar, botones, encabezados)
-  - Naranja `#f99e16` (acento: estados activos, iconos, CTAs)
+  - **Azul marino `#233a72`** (marca: sidebar, botones, títulos). Se distingue el
+    **relleno** de marca `--corp-brand` (sólido, fijo en ambos temas) del **acento de
+    texto** `--corp-indigo` (se aclara en modo oscuro para legibilidad de títulos).
+  - **Celeste `#2f9bd8`** (acento: iconos, badges, hover de enlaces, `.btn-corp-accent`);
+    tokens `--corp-accent` / `--corp-accent-600`. Los alias **`--corp-orange*` siguen
+    existiendo** apuntando al celeste (compatibilidad con vistas previas).
+  - *Nota histórica:* la paleta original era Indigo `#232762` + Naranja `#f99e16`; se
+    cambió el naranja (recordaba a la marca de un banco) → teal → **celeste**, y el
+    índigo se **suavizó** a azul marino.
+- **Tema claro/oscuro** con el modo nativo de Bootstrap 5.3 (`data-bs-theme` en `<html>`):
+  conmutador en la topbar, preferencia en `localStorage`, **sin parpadeo** (script en
+  `<head>`), respeta `prefers-color-scheme`. El bloque `[data-bs-theme="dark"]` de
+  `corporate.css` redefine los tokens `--corp-*`. *(Pendiente: el login sigue en claro.)*
 - Tokens y componentes en `public/css/corporate.css`
-  (`--corp-indigo`, `--corp-orange`, `.btn-corp`, `.card-corp`, `.sidebar-*`, `.feed-*`).
+  (`--corp-brand`, `--corp-indigo`, `--corp-accent`, `.btn-corp`, `.card-corp`, `.sidebar-*`, `.feed-*`).
 - Dominio y textos **en español** (con `__()` para permitir EN).
 
 ---
@@ -102,7 +118,17 @@ Administrador, Moderador (psicólogo) y Usuario.
 **Alcance por proyecto:** feed y dashboard del Usuario se filtran por sus proyectos
 (`proyecto_user`). Admin/Moderador (`esGestor`) ven todo.
 
-**Cuestionarios / escalas** — ver sección 7.
+**Cuestionarios / escalas** — ver sección 7. La **asignación** es un modelo propio
+`CuestionarioAsignacion` (`cuestionario_asignaciones`: `cuestionario_id`, `user_id`,
+`asignado_por`, `estado` `pendiente|completado`, `completado_at`, `es_directivo`).
+Se asigna **individual** o **masivo por proyecto/todos** (`CuestionarioController::asignarMasivo`,
+idempotente). Las respuestas van en `CuestionarioRespuesta` (`asignacion_id`, `pregunta_id`, `valor`).
+
+**Pacientes** (rol `Usuario`) — pantalla dedicada `PacienteController` (separada de
+*Usuarios*), rol **fijo** *Usuario* sin selector, con **carga masiva** desde Excel
+`.xlsx` o CSV con **previsualización** (`App\Livewire\CargaMasivaPacientes` +
+`App\Services\ImportadorPacientes`, detección de `.xlsx` por firma `PK` y lectura con
+PhpSpreadsheet). Contraseña temporal por defecto (ver deuda técnica, sección 13).
 
 **Citas psicológicas** (agendamiento)
 - **Cita** (`citas`): `user_id`, `moderador_id`, `modalidad` (`presencial|virtual`),
@@ -124,7 +150,10 @@ Administrador, Moderador (psicólogo) y Usuario.
 
 ---
 
-## 6. Funcionalidades (todas en `master`)
+## 6. Funcionalidades
+
+> Los ítems **1–11** están en `master`. Los **12–16** están **pendientes de PR**
+> (en ramas + `integracion/local`; ver sección 11).
 
 1. **Login** Bootstrap split-screen + credenciales demo. Post-login: Usuario → feed;
    Moderador/Admin → dashboard.
@@ -147,6 +176,19 @@ Administrador, Moderador (psicólogo) y Usuario.
 9. **Citas psicológicas + horarios** — sección 8.
 10. **Charlas** — sección 9.
 11. **Recordatorios / notificaciones por rol** — sección 10.
+12. **Pacientes + carga masiva Excel/CSV** *(pendiente PR)* — sección 5. Rol fijo
+    *Usuario*, previsualización antes de importar, plantilla `.xlsx` descargable.
+13. **Dashboard ejecutivo de progreso** *(pendiente PR)* — `/dashboard/progreso` (ruta
+    `progreso`, solo gestores). KPIs globales, **avance general** con dona y
+    **distribución por nivel**, **progreso por proyecto**, lista **"Requieren atención"**
+    (pacientes sin actividad reciente), **cronograma** de actividades y **detalle por
+    paciente**. "Contenido realizado" se infiere del **comentario** (mismo criterio que
+    el panel del paciente); cuestionarios y charlas usan datos reales. Enlace en el
+    sidebar dentro del grupo **Principal**.
+14. **Asignación masiva de cuestionarios** *(pendiente PR)* por proyecto o a todos.
+15. **Alcance de citas por psicólogo** *(pendiente PR)*: el **Moderador** solo ve/gestiona
+    **sus** citas (`moderador_id`); el **Administrador** ve todas (`CitaAdminController`).
+16. **Tema claro/oscuro + paleta "Sereno"** *(pendiente PR)* — sección 3.
 
 ### Seeders (`DatabaseSeeder`, en orden)
 `RolSeeder`, `PermissionSeeder`, `UserSeeder`, `ModeradorSeeder`,
@@ -246,17 +288,26 @@ Cada ítem: icono, color (naranja=cita, índigo=charla), título, líneas y acci
 
 ### Regla de git (importante)
 - **NO se trabaja sobre `master` directamente.** Cada funcionalidad va en su rama
-  `feat/...` y se **consulta al dueño antes de hacer `git push`**.
+  `feat/...` y se **consulta al dueño antes de hacer `git push`** y antes de mergear.
+- **Integración continua local:** tras cada cambio, la rama se **fusiona en
+  `integracion/local`** (creada desde `master`) para ver todo junto y resolver conflictos
+  poco a poco. `integracion/local` **NO se sube** al remoto; es solo de revisión.
 - `gh` CLI **no** está instalado; los PRs se crean con el enlace de "compare".
 - Tras sincronizar: `composer install`, `php artisan migrate`,
   `php artisan storage:link`, `php artisan optimize:clear`.
 
 ### Estado actual
-- `master` (`origin`) al día, contiene **todo** lo de las secciones 6–10:
-  cuestionarios/escalas, adjuntos en comentarios, citas + horarios, charlas en el
-  feed, recordatorios por rol, y los fixes de foto de charla (guardado y borrado
-  con ruta relativa).
-- Ramas de esas features **mergeadas y borradas** (repo limpio).
+- `master` (`origin`) contiene lo de las secciones 6–10 (ítems 1–11): cuestionarios/
+  escalas, adjuntos, citas + horarios, charlas en el feed, recordatorios, y los fixes de
+  foto de charla (ruta relativa). Esas ramas están **mergeadas y borradas**.
+- **Ramas pendientes de PR** (subidas a `origin`, **sin mergear a `master`**):
+  `feat/asignacion-masiva-cuestionarios`, `fix/citas-scope-psicologo`,
+  `feat/gestion-pacientes`, `feat/dashboard-progreso`, `feat/tema-oscuro`
+  (esta última con la paleta Sereno y el botón celeste ya **revertido**; sus últimos
+  commits pueden estar solo en local).
+- **`integracion/local`** (solo local): agrega las 5 ramas anteriores; es donde se
+  revisa el conjunto. Es independiente por rama, así que se pueden mergear a `master`
+  en cualquier orden. La #`feat/gestion-pacientes` exige `ext-zip` en el entorno.
 
 ### Repo de documentación
 - Este archivo `docs/CONTEXTO-PROYECTO.md` **no** se versiona en el repo del proyecto;
@@ -267,7 +318,9 @@ Cada ítem: icono, color (naranja=cita, índigo=charla), título, líneas y acci
 ## 12. Cómo levantar el proyecto
 
 ```bash
-composer install                    # incluye Livewire y getid3
+# Requisito PHP: habilitar ext-zip (para PhpSpreadsheet / carga masiva Excel).
+#   En Laragon: descomentar `extension=zip` en php.ini y REINICIAR Laragon.
+composer install                    # incluye Livewire, getid3 y phpspreadsheet
 cp .env.example .env                # DB_DATABASE=psicologia, MySQL 127.0.0.1:3306, root
 php artisan key:generate
 php artisan migrate:fresh --seed
@@ -276,6 +329,9 @@ php artisan serve                   # http://127.0.0.1:8000
 ```
 
 - No requiere `npm` para la UI (Bootstrap, Chart.js, flatpickr por CDN).
+- **`ext-zip` obligatoria** para la carga masiva de pacientes en `.xlsx` (un `.xlsx`
+  es un ZIP). Sin ella, la subida/descarga de plantilla falla en runtime. En Laragon,
+  reiniciar el servicio tras habilitarla (el proceso web no relee php.ini en caliente).
 - Tras cambiar de rama o mergear: `php artisan optimize:clear && php artisan migrate`.
 
 ---
@@ -297,3 +353,39 @@ php artisan serve                   # http://127.0.0.1:8000
 - Posibles siguientes pasos: Cronbach's Alpha y filtros por sector del NOSACQ,
   editar/eliminar cuestionarios desde la UI, exportar resultados (PDF/CSV),
   notificaciones por correo/push más completas, recordatorios reactivos (Livewire).
+
+---
+
+## 14. Deuda técnica conocida (de la auditoría, julio 2026)
+
+Análisis multi-área sobre `integracion/local`. **Fortalezas confirmadas:** autorización
+a nivel de objeto sólida, transacciones + `lockForUpdate`, sin mass assignment, sin
+inyección SQL ni XSS, seeders idempotentes, login sin enumeración de usuarios.
+
+**Prioridad alta**
+- **Seguridad:** contraseña temporal **hardcodeada** `'SafePoint123'` (igual para todos
+  los pacientes importados, se muestra en pantalla, sin forzar cambio) — `ImportadorPacientes`.
+  Y **login sin `throttle`** (fuerza bruta) — `routes/web.php`. Es la cadena más explotable.
+- **Rendimiento:** `whereRaw("CONCAT(fecha,' ',hora) >= ?")` (5 sitios) **anula los
+  índices** de `citas` → comparar por columnas. `FeedController` carga **todo** el feed
+  en memoria y pagina en PHP. `DashboardProgresoController` materializa todo en PHP.
+- **Frontend:** el **login queda en claro** (layout guest sin `data-bs-theme` + `bg-white`);
+  `dashboard/progreso.blade.php` usa hex pastel fijos que rompen el modo oscuro.
+- **Calidad:** **sin tests reales** (solo `ExampleTest`); README genérico de Laravel;
+  `ext-zip` no declarada en `composer.json`; **seeders demo se ejecutan con los de producción**.
+
+**Prioridad media**
+- **Redundancia:** `PacienteController` ≈ `UserController` (CRUD casi idéntico);
+  claves i18n **huérfanas** (flujo CSV viejo) y **duplicadas** en `lang/en.json`; regla
+  "contenido realizado = comentado" duplicada en los dos dashboards; literal `'Usuario'`
+  repetido en 3 archivos; borrado de foto de charla duplicado (mover al modelo).
+- **Alcance del Moderador:** hoy un psicólogo ve datos clínicos (respuestas, progreso) de
+  **todos** los pacientes, sin importar proyecto/asignación — revisar need-to-know.
+- **Frontend:** cabecera de página duplicada en ~40 vistas (→ `<x-page-header>`); avatar
+  y tarjeta KPI como componentes; `confirm()` nativo vs. diálogo estilizado; email de
+  cita sin `__()`.
+- **Tooling:** sin FormRequests (validación inline), sin CI, sin PHPStan/Larastan.
+
+**Prioridad baja:** `welcome.blade.php` muerto; token `--corp-orange-50` inexistente;
+overlay blanco en `contenidos-table`; botones de borrar sin `aria-label`; docstring
+desactualizado en `ImportadorPacientes`.
