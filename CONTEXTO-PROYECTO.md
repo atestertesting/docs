@@ -2,12 +2,17 @@
 
 > Documento de contexto autocontenido para entregar a otra IA / desarrollador.
 > Resume arquitectura, decisiones, funcionalidades y estado del repositorio.
-> Última actualización: julio 2026. **En `master`:** cuestionarios/escalas, adjuntos
-> en comentarios, citas psicológicas + horarios, y recordatorios por rol. **Pendientes
-> de PR** (cada una en su rama `feat/…` + integradas en la rama local `integracion/local`):
-> gestión de **pacientes** + carga masiva Excel, **dashboard ejecutivo de progreso**,
-> **asignación masiva** de cuestionarios, **alcance de citas por psicólogo**, y
-> **tema claro/oscuro** con la nueva **paleta "Sereno"** (azul + celeste). Ver sección 11.
+> Última actualización: agosto 2026. **En `master`:** cuestionarios/escalas, adjuntos en
+> comentarios, citas + horarios, charlas, recordatorios, **gestión de pacientes** + carga
+> masiva Excel, **dashboard ejecutivo de progreso**, **asignación masiva** de cuestionarios,
+> **alcance de citas por psicólogo** y **tema claro/oscuro (paleta "Sereno")** — estos
+> últimos ya **mergeados vía PR**.
+> **Pendiente de PR — un solo PR consolidado `release/consolidado-2026-07`** (rama subida a
+> `origin`, base `master`) que integra: **escalas BAI y BDI-II**, **interpretación + matriz por
+> persona + export Excel del DASS-21**, **datos demográficos del paciente**, **Informe
+> Psicológico de Seguimiento** (PDF), **ficha/expediente del paciente**, **recurso de permisos
+> PACIENTES**, **gestor programa citas**, **Plan de trabajo tipo Gantt + asistencia**, e imagen
+> de referencia en charlas. Ver secciones 11, 15 y 16.
 
 ---
 
@@ -37,7 +42,8 @@ Administrador, Moderador (psicólogo) y Usuario.
 | Auth/RBAC | **spatie/laravel-permission 8** |
 | UI reactiva | **Livewire 4** (usuarios/roles, gestión de charla, horarios, agendar cita) |
 | Multimedia | `james-heinrich/getid3` (metadatos audio); storage local (`storage:link`) |
-| Importación | **phpoffice/phpspreadsheet 5.8** (carga masiva de pacientes `.xlsx`/CSV) — **requiere `ext-zip`** en PHP |
+| Importación | **phpoffice/phpspreadsheet 5.8** (carga masiva de pacientes `.xlsx`/CSV, export de matriz de resultados) — **requiere `ext-zip`** en PHP |
+| PDF | **barryvdh/laravel-dompdf** (Informe Psicológico de Seguimiento en PDF) |
 | Gráficos | **Chart.js 4** por CDN (diagramas radar de cuestionarios) |
 | Calendario | **flatpickr 4.6** por CDN (agendar cita: bloquea domingos y feriados) |
 | Videollamada | Enlaces **Jitsi** autogenerados (`https://meet.jit.si/SafePoint-Cita-…`) |
@@ -92,11 +98,16 @@ Administrador, Moderador (psicólogo) y Usuario.
 
 ### Roles y permisos
 - Permisos `{recurso}.{accion}` × (`ver, crear, editar, eliminar`). Recursos:
-  `usuarios, roles, proyectos, modulos, contenidos, cuestionarios, reuniones,
-  documentos, videos, imagenes, evaluaciones, citas, charlas, feriados, psicologos`.
+  `usuarios, pacientes, roles, proyectos, modulos, contenidos, cuestionarios, reuniones,
+  documentos, videos, imagenes, evaluaciones, citas, charlas, feriados, psicologos, planes`.
+- **`pacientes` separado de `usuarios`** (decisión): las rutas/vistas de pacientes usan
+  `pacientes.*` (antes reusaban `usuarios.*`), para que el **Moderador vea la ficha del
+  paciente sin acceder a la gestión del staff**. Migración **aditiva** (`givePermissionTo`,
+  no `syncPermissions`) para no resetear permisos existentes.
 - **Administrador es super-admin** vía `Gate::before()` en `AppServiceProvider`.
-- **Moderador (psicólogo):** gestiona contenido/módulos/cuestionarios/**charlas** y
-  `citas.ver/editar` (atiende citas, no agenda).
+- **Moderador (psicólogo):** gestiona contenido/módulos/cuestionarios/**charlas**,
+  **planes** (`planes.*`), **ve pacientes** (`pacientes.ver`) y `citas.ver/crear/editar`
+  (ahora **también agenda** citas para sus pacientes; ver sección 8).
 - **Usuario (paciente):** `.ver` de consulta + `citas.crear` (agenda sus citas).
 - Middleware en `bootstrap/app.php`: `role`, `permission`, `role_or_permission`.
 - **Nota:** el subsistema *evaluaciones* existe en BD/permisos pero se **quitó de la
@@ -128,7 +139,24 @@ idempotente). Las respuestas van en `CuestionarioRespuesta` (`asignacion_id`, `p
 *Usuarios*), rol **fijo** *Usuario* sin selector, con **carga masiva** desde Excel
 `.xlsx` o CSV con **previsualización** (`App\Livewire\CargaMasivaPacientes` +
 `App\Services\ImportadorPacientes`, detección de `.xlsx` por firma `PK` y lectura con
-PhpSpreadsheet). Contraseña temporal por defecto (ver deuda técnica, sección 13).
+PhpSpreadsheet). Contraseña temporal por defecto (ver deuda técnica, sección 14).
+- **Datos demográficos/laborales** en `users` (nullable): `sexo` (Masculino/Femenino),
+  `fecha_nacimiento` (date), `puesto`, `area`. Helper `User::edad()` (derivada de la fecha).
+  Se capturan en el formulario y en la carga masiva (el importador normaliza sexo M/F y
+  fecha). Alimentan la columna "Puesto" de la matriz de resultados y preparan baremos (MCMI-II).
+- **Ficha/expediente del paciente** (`PacienteController::show`, `pacientes.show`,
+  `pacientes.ver`): página con pestañas **Datos · Informes · Cuestionarios · Citas**.
+  Los informes se consultan por `user_id` (a través de sus citas); la pestaña
+  Cuestionarios reusa `CalificadorCuestionario` para mostrar puntaje + nivel.
+
+**Informe Psicológico de Seguimiento** (`informes_seguimiento`, 1:1 con una **cita
+completada**) — ver sección 15. Snapshot de identificación/firma + 8 secciones (I–VIII),
+`estado_informe` (`borrador|finalizado`). `Cita::informe()` y `Cita::admiteInforme()`
+(solo citas `completada`).
+
+**Plan de trabajo / Cronograma tipo Gantt** (`planes` + `plan_actividades`) — ver
+sección 16. Plan por **proyecto** con actividades por **bloque**; `plan_actividades.charla_id`
+(opcional) vincula una actividad-taller con una **Charla** para consolidar asistencia.
 
 **Citas psicológicas** (agendamiento)
 - **Cita** (`citas`): `user_id`, `moderador_id`, `modalidad` (`presencial|virtual`),
@@ -145,15 +173,16 @@ PhpSpreadsheet). Contraseña temporal por defecto (ver deuda técnica, sección 
 
 **Charlas**
 - **Charla** (`charlas`): `titulo`, `descripcion`, `fecha` (datetime), `estado`
-  (`pendiente|finalizada`), `foto` (evidencia), `creado_por`. Pivote `charla_user`
-  con `asistio`. `estaFinalizada()`.
+  (`pendiente|finalizada`), `foto` (**evidencia**, tras finalizar), `imagen` (**referencia**,
+  la sube quien crea la charla), `creado_por`. Pivote `charla_user` con `asistio`.
+  `estaFinalizada()`. En el feed se muestra la evidencia si existe, si no la de referencia.
 
 ---
 
 ## 6. Funcionalidades
 
-> Los ítems **1–11** están en `master`. Los **12–16** están **pendientes de PR**
-> (en ramas + `integracion/local`; ver sección 11).
+> Los ítems **1–16** están en `master`. Los **17–24** van en el **PR consolidado
+> `release/consolidado-2026-07`** (pendiente de merge; ver secciones 11, 15 y 16).
 
 1. **Login** Bootstrap split-screen + credenciales demo. Post-login: Usuario → feed;
    Moderador/Admin → dashboard.
@@ -176,24 +205,39 @@ PhpSpreadsheet). Contraseña temporal por defecto (ver deuda técnica, sección 
 9. **Citas psicológicas + horarios** — sección 8.
 10. **Charlas** — sección 9.
 11. **Recordatorios / notificaciones por rol** — sección 10.
-12. **Pacientes + carga masiva Excel/CSV** *(pendiente PR)* — sección 5. Rol fijo
+12. **Pacientes + carga masiva Excel/CSV** — sección 5. Rol fijo
     *Usuario*, previsualización antes de importar, plantilla `.xlsx` descargable.
-13. **Dashboard ejecutivo de progreso** *(pendiente PR)* — `/dashboard/progreso` (ruta
+13. **Dashboard ejecutivo de progreso** — `/dashboard/progreso` (ruta
     `progreso`, solo gestores). KPIs globales, **avance general** con dona y
     **distribución por nivel**, **progreso por proyecto**, lista **"Requieren atención"**
     (pacientes sin actividad reciente), **cronograma** de actividades y **detalle por
     paciente**. "Contenido realizado" se infiere del **comentario** (mismo criterio que
     el panel del paciente); cuestionarios y charlas usan datos reales. Enlace en el
     sidebar dentro del grupo **Principal**.
-14. **Asignación masiva de cuestionarios** *(pendiente PR)* por proyecto o a todos.
-15. **Alcance de citas por psicólogo** *(pendiente PR)*: el **Moderador** solo ve/gestiona
+14. **Asignación masiva de cuestionarios** por proyecto o a todos.
+15. **Alcance de citas por psicólogo**: el **Moderador** solo ve/gestiona
     **sus** citas (`moderador_id`); el **Administrador** ve todas (`CitaAdminController`).
-16. **Tema claro/oscuro + paleta "Sereno"** *(pendiente PR)* — sección 3.
+16. **Tema claro/oscuro + paleta "Sereno"** — sección 3.
+17. **Escalas BAI y BDI-II** *(PR consolidado)* — sección 7. Nuevos `tipo` en
+    `config/cuestionarios.php` + seeders (`CuestionarioBaiSeeder`, `CuestionarioBdiSeeder`).
+    BDI-II usa **opciones por ítem** (`preguntas_cuestionario.opciones`).
+18. **DASS-21: interpretación + matriz por persona + Excel** *(PR consolidado)* — texto de
+    interpretación por nivel, tabla "por persona" (`App\Services\MatrizResultados`) y
+    **exportación a `.xlsx`** con el formato del documento.
+19. **Datos demográficos del paciente** *(PR consolidado)* — sexo, fecha nac., puesto, área
+    (form + carga masiva); ver sección 5.
+20. **Informe Psicológico de Seguimiento** *(PR consolidado)* — sección 15.
+21. **Ficha/expediente del paciente** *(PR consolidado)* — pestañas Datos · Informes ·
+    Cuestionarios · Citas; ver sección 5.
+22. **Recurso de permisos PACIENTES** *(PR consolidado)* — separado del staff; ver sección 4.
+23. **Gestor programa citas + enganche a informe** *(PR consolidado)* — sección 8.
+24. **Plan de trabajo (Gantt) + Asistencia** *(PR consolidado)* — sección 16.
 
 ### Seeders (`DatabaseSeeder`, en orden)
 `RolSeeder`, `PermissionSeeder`, `UserSeeder`, `ModeradorSeeder`,
 `PsicologoDemoSeeder`, `HorarioDefectoSeeder`, `ProyectoSeeder`, `ContenidoDemoSeeder`,
-`CuestionarioDass21Seeder`, `CuestionarioNosacq50Seeder`, `Nosacq50RespuestasDemoSeeder`,
+`CuestionarioDass21Seeder`, `CuestionarioBaiSeeder`, `CuestionarioBdiSeeder`,
+`CuestionarioNosacq50Seeder`, `Nosacq50RespuestasDemoSeeder`,
 `FeriadoSeeder`. (No hay `CharlaSeeder`: las charlas se crean desde la UI.)
 
 ### Usuarios demo (contraseña: `password`)
@@ -214,9 +258,20 @@ Escalas de puntaje continuo, **config-driven** (`config/cuestionarios.php` por `
 - Nivel por dimensión con `bandas`.
 
 **Escalas incluidas**
-- **DASS-21** — escala 0-3, suma (×2), 3 dimensiones (depresión/ansiedad/estrés).
+- **DASS-21** — escala 0-3, suma (×2), 3 dimensiones (depresión/ansiedad/estrés). Con
+  **texto de interpretación por nivel** en resultados.
+- **BAI** (ansiedad de Beck) — escala 0-3, suma, 1 dimensión; niveles muy baja/moderada/severa.
+- **BDI-II** (depresión de Beck) — escala 0-3, suma, 1 dimensión; niveles mínima/leve/
+  moderada/grave. Usa **opciones por ítem** (`preguntas_cuestionario.opciones`, JSON) —
+  ítems 16/18 con variantes a/b **aplanadas a 0-3**.
 - **NOSACQ-50** — escala 1-4, promedio, **7 dimensiones**, **21 ítems inversos**;
   `requiere_puesto` separa Trabajadores/Directivos.
+
+**Resultados por persona + Excel** (`App\Services\MatrizResultados`): matriz genérica
+(una fila por asignación, con respuestas Q1..Qn + puntaje/nivel por dimensión) que sirve
+para DASS-21/BAI/BDI. `CuestionarioController::exportarResultados` genera un `.xlsx` con el
+formato del documento (cabecera con fill corporativo, `freezePane('C2')`). El nivel de cada
+resultado incluye su **interpretación** (definida en `config/cuestionarios.php`, banda `bandas`).
 
 **Flujo:** gestor asigna en `/cuestionarios/{id}` → Usuario responde en
 **"Mis cuestionarios"** (solo no-gestores) → Admin revisa respuestas y ve
@@ -241,12 +296,19 @@ del psicólogo por día/modalidad (fallback a `config/citas.php` si no definió 
 `config/citas.php`: `sesion_minutos=30`, `cancelacion_horas_min=24`, modalidades con
 horario por defecto (presencial 12:00-15:00, virtual 13:00-15:00).
 
+**Modo gestor (nuevo):** el mismo `AgendarCita` admite `mount(gestor: true)` para que un
+gestor **programe una cita a un paciente existente** (botón "Nueva cita" en Gestión de citas,
+permiso `citas.crear`): paso 0 elige paciente; el **Moderador se auto-asigna** como psicólogo
+(salta ese paso), el **Admin elige** cualquiera; guarda `user_id` = paciente. Candado: el
+Moderador solo puede agendarse a sí mismo. Admite `?paciente=ID` para precargar (lo usa el
+botón **"Programar próxima sesión"** del informe; ver sección 15).
+
 **Paneles**
 - Usuario: **Mis citas** (ver/cancelar, respeta política de cancelación).
 - Psicólogo: **Mi horario** (`App\Livewire\GestionHorario`, define su disponibilidad;
   se precargan 12 bloques por defecto editables).
-- Admin/Moderador: **Gestión de citas** (estado), CRUD de **Psicólogos** (con botón
-  Horarios) y **Feriados** (tabla).
+- Admin/Moderador: **Gestión de citas** (estado + **columna Informe** + **Nueva cita**),
+  CRUD de **Psicólogos** (con botón Horarios) y **Feriados** (tabla).
 
 ---
 
@@ -254,17 +316,20 @@ horario por defecto (presencial 12:00-15:00, virtual 13:00-15:00).
 
 - CRUD de charlas + **asistencia** (`charla_user.asistio`) vía Livewire
   `App\Livewire\GestionCharla` en `/charlas/{id}` (`charlas.show`).
-- Flujo: agregar asistentes → **finalizar** → subir **foto de evidencia**.
+- Flujo: agregar asistentes → **finalizar** → subir **foto de evidencia**. Al **crear/editar**
+  la charla se puede adjuntar una **imagen de referencia** (`imagen`, distinta de `foto`;
+  `CharlaController` con `enctype=multipart`, guardada como `/storage/...`).
 - **En el feed**: charlas **finalizadas con foto** (registro con asistencia) y
   charlas **programadas a futuro** (anuncio). Cada tarjeta tiene ancla `#charla-ID`
   (los recordatorios enlazan a ella con realce `:target`). Gestores ven **todas** las
   charlas con pie de gestión (N inscritos + Gestionar).
 
-> ⚠️ **Convención de foto** (charla) y adjuntos: se guardan como **ruta relativa**
-> `/storage/...` (con `parse_url(..., PHP_URL_PATH)`), no absoluta, para que la imagen
-> resuelva sin importar el host/puerto. El **borrado** (`GestionCharla` y
-> `CharlaController::eliminarFoto`) usa el mismo prefijo `/storage/`. Los contenidos
-> (videos/imágenes/documentos) **sí** siguen usando URL absoluta (coherente aparte).
+> ⚠️ **Convención de archivos subidos**: se guardan como **ruta relativa** `/storage/...`
+> (no absoluta con host), para que resuelvan sin importar el dominio/puerto. Aplica a la
+> **foto/imagen de charla**, **adjuntos de comentario** y — desde el PR consolidado —
+> **también a los contenidos** (video/imagen/documento/audio en `ContenidoController`, antes
+> guardaban la URL absoluta con `APP_URL` → se rompían al navegar en otro dominio). El
+> **borrado** usa el mismo prefijo `/storage/` (reconoce también la forma absoluta antigua).
 
 ---
 
@@ -297,17 +362,19 @@ Cada ítem: icono, color (naranja=cita, índigo=charla), título, líneas y acci
   `php artisan storage:link`, `php artisan optimize:clear`.
 
 ### Estado actual
-- `master` (`origin`) contiene lo de las secciones 6–10 (ítems 1–11): cuestionarios/
-  escalas, adjuntos, citas + horarios, charlas en el feed, recordatorios, y los fixes de
-  foto de charla (ruta relativa). Esas ramas están **mergeadas y borradas**.
-- **Ramas pendientes de PR** (subidas a `origin`, **sin mergear a `master`**):
-  `feat/asignacion-masiva-cuestionarios`, `fix/citas-scope-psicologo`,
-  `feat/gestion-pacientes`, `feat/dashboard-progreso`, `feat/tema-oscuro`
-  (esta última con la paleta Sereno y el botón celeste ya **revertido**; sus últimos
-  commits pueden estar solo en local).
-- **`integracion/local`** (solo local): agrega las 5 ramas anteriores; es donde se
-  revisa el conjunto. Es independiente por rama, así que se pueden mergear a `master`
-  en cualquier orden. La #`feat/gestion-pacientes` exige `ext-zip` en el entorno.
+- `master` (`origin`) contiene los **ítems 1–16**: cuestionarios/escalas, adjuntos, citas +
+  horarios, charlas, recordatorios, **pacientes + carga masiva**, **dashboard de progreso**,
+  **asignación masiva**, **alcance de citas por psicólogo** y **tema claro/oscuro (Sereno)** —
+  estos 5 últimos ya **mergeados vía PRs #16/#18/#20** (+ 2 merges directos).
+- **Pendiente: un solo PR consolidado** `release/consolidado-2026-07` (rama **subida a
+  `origin`**, base `master`) con los **ítems 17–24**. Se optó por **un PR** (no varios) porque
+  `integracion/local` **divergió** de `master` (arrastraba commits de tema-oscuro/perf que
+  master ya tenía por otra vía); consolidar evita conflictos/duplicados. El único conflicto
+  (`lang/en.json`) se resolvió conservando las claves de ambas ramas.
+- **`integracion/local`** (solo local): rama de integración continua donde se fue armando todo.
+  El PR consolidado se generó ramificando de `master` y fusionando `integracion/local`.
+- Al desplegar el PR: `composer install` (dompdf), `php artisan migrate`, `php artisan
+  storage:link`; escalas de ejemplo con `db:seed --class=CuestionarioBaiSeeder`/`...BdiSeeder`.
 
 ### Repo de documentación
 - Este archivo `docs/CONTEXTO-PROYECTO.md` **no** se versiona en el repo del proyecto;
@@ -320,7 +387,7 @@ Cada ítem: icono, color (naranja=cita, índigo=charla), título, líneas y acci
 ```bash
 # Requisito PHP: habilitar ext-zip (para PhpSpreadsheet / carga masiva Excel).
 #   En Laragon: descomentar `extension=zip` en php.ini y REINICIAR Laragon.
-composer install                    # incluye Livewire, getid3 y phpspreadsheet
+composer install                    # incluye Livewire, getid3, phpspreadsheet y dompdf
 cp .env.example .env                # DB_DATABASE=psicologia, MySQL 127.0.0.1:3306, root
 php artisan key:generate
 php artisan migrate:fresh --seed
@@ -362,6 +429,15 @@ Análisis multi-área sobre `integracion/local`. **Fortalezas confirmadas:** aut
 a nivel de objeto sólida, transacciones + `lockForUpdate`, sin mass assignment, sin
 inyección SQL ni XSS, seeders idempotentes, login sin enumeración de usuarios.
 
+**Ya resuelto en el PR consolidado:** URLs de archivos de **contenido** ahora relativas
+`/storage/...` (antes absolutas con `APP_URL` → imágenes rotas por dominio); `confirm()`
+nativo reemplazado por el **diálogo estilizado** (`data-confirm`) en el informe;
+**autoría del informe** restringida al **psicólogo tratante** (el Admin no redacta informes
+ajenos, solo lee/PDF) — mitiga parcialmente el punto de *alcance del Moderador*.
+**Sigue pendiente:** contraseña temporal fija + throttle de login, `whereRaw CONCAT`,
+login en claro, tests, `ext-zip` en `composer.json`, seeders demo en producción, y el
+*alcance clínico del Moderador* (aún ve la ficha de **todos** los pacientes).
+
 **Prioridad alta**
 - **Seguridad:** contraseña temporal **hardcodeada** `'SafePoint123'` (igual para todos
   los pacientes importados, se muestra en pantalla, sin forzar cambio) — `ImportadorPacientes`.
@@ -389,3 +465,54 @@ inyección SQL ni XSS, seeders idempotentes, login sin enumeración de usuarios.
 **Prioridad baja:** `welcome.blade.php` muerto; token `--corp-orange-50` inexistente;
 overlay blanco en `contenidos-table`; botones de borrar sin `aria-label`; docstring
 desactualizado en `ImportadorPacientes`.
+
+---
+
+## 15. Informe Psicológico de Seguimiento *(PR consolidado)*
+
+Documento clínico individual **por cita completada** (`informes_seguimiento`, 1:1 con la
+cita, `cita_id` unique). Nace del ciclo: *indicador detectado en un test → cita → informe →
+recomendación → próxima cita*.
+
+- **Estructura**: I. Datos de identificación + secciones **II–VIII** (Motivo, Antecedentes,
+  Problema actual, Observaciones clínicas, Impresión psicológica, Conclusiones,
+  Recomendaciones). Se guarda **snapshot** de identificación y firma (nombre/colegiatura del
+  psicólogo) para que un informe finalizado no cambie si luego se edita el perfil.
+- **Ciclo**: `estado_informe` `borrador → finalizado` (finalizado = solo lectura + PDF;
+  "Reabrir" vuelve a borrador). PDF con **dompdf** (`informes.pdf`, formato del documento).
+- **Autoría vs lectura** (`InformeSeguimientoController`): **crear/editar/finalizar/reabrir =
+  solo el moderador dueño de la cita**; **ver/PDF = dueño o Administrador**. El Admin no
+  redacta informes ajenos.
+- **Motivo precargado**: al crear, si no hay motivo, se toma el **último indicador elevado**
+  del paciente (`App\Services\IndicadorTest`, recorre DASS-21/BAI/BDI y devuelve p. ej.
+  "BDI-II: Depresión leve") — editable.
+- **Enganche a cita**: botón **"Programar próxima sesión"** abre el asistente en modo gestor
+  con el paciente precargado (`?paciente=ID`, tipo seguimiento).
+- **Accesos**: columna **Informe** en Gestión de citas (crear/continuar/ver según estado) y
+  en la pestaña Informes de la ficha del paciente. `ocupacion` se precarga del `puesto`.
+
+---
+
+## 16. Plan de trabajo — Cronograma tipo Gantt + Asistencia *(PR consolidado)*
+
+Fase 3 del "Plan de Seguridad Integral" (del documento del cliente). Menú **"Plan de
+trabajo"**, permiso `planes.*` (Admin y Moderador).
+
+**3a — Cronograma/Gantt** (`planes` + `plan_actividades`, `PlanController`)
+- Plan **por proyecto** con `fecha_inicio/fin`; actividades por **bloque** (Propuesta ·
+  Data y análisis · Programa · Gestión y cierre), con `responsable`, `plazo_texto`,
+  `fecha_inicio/fin`, `estado` (`por_realizar|en_curso|realizada`), `avance %`.
+- **Grilla semanal** (13+ meses en columnas de semana agrupadas por mes): el **color de cada
+  celda se DERIVA** de fechas + estado (no se pinta a mano). Columna de actividad fija
+  (sticky) + scroll horizontal. `Plan::semanas()` y `PlanActividad::estadoEnSemana()`.
+- Alta/edición de actividad **inline** (`?editar=ID`); si vinculas una charla con fecha y no
+  indicas fechas, la actividad **hereda la fecha de la charla**.
+
+**3b — Asistencia** (`PlanController::asistencia`, `planes.asistencia`)
+- Matriz **pacientes del proyecto × talleres** (actividades con `charla_id`), con marca de
+  asistencia (leída de `charla_user`) y **% de participación** por persona + totales.
+- La asistencia se **sigue registrando en cada Charla**; el plan solo la **consolida**.
+
+**Pendiente (no construido):** 3c — Seguimiento por tipo de caso (conteo semanal, iniciales
+de apellido F/M/A/V) · 3d — Bitácora (comentarios narrativos por jornada). También queda el
+**Hub de Reportes** (lista global de informes) como cierre de la fase de reportes.
