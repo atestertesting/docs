@@ -2,17 +2,15 @@
 
 > Documento de contexto autocontenido para entregar a otra IA / desarrollador.
 > Resume arquitectura, decisiones, funcionalidades y estado del repositorio.
-> Última actualización: agosto 2026. **En `master`:** cuestionarios/escalas, adjuntos en
-> comentarios, citas + horarios, charlas, recordatorios, **gestión de pacientes** + carga
-> masiva Excel, **dashboard ejecutivo de progreso**, **asignación masiva** de cuestionarios,
-> **alcance de citas por psicólogo** y **tema claro/oscuro (paleta "Sereno")** — estos
-> últimos ya **mergeados vía PR**.
-> **Pendiente de PR — un solo PR consolidado `release/consolidado-2026-07`** (rama subida a
-> `origin`, base `master`) que integra: **escalas BAI y BDI-II**, **interpretación + matriz por
-> persona + export Excel del DASS-21**, **datos demográficos del paciente**, **Informe
-> Psicológico de Seguimiento** (PDF), **ficha/expediente del paciente**, **recurso de permisos
-> PACIENTES**, **gestor programa citas**, **Plan de trabajo tipo Gantt + asistencia**, e imagen
-> de referencia en charlas. Ver secciones 11, 15 y 16.
+> Última actualización: agosto 2026. **Todo lo descrito está en `master`** (el equipo también
+> aporta en paralelo). Lo más reciente **mergeado a `master`**: **escalas BAI/BDI-II** +
+> interpretación/matriz/export del DASS-21, **datos demográficos** del paciente, **Informe
+> Psicológico de Seguimiento** (PDF), **ficha/expediente del paciente**, **permisos PACIENTES**,
+> **gestor programa citas**, imagen de referencia en charlas, y el **Plan de trabajo tipo Gantt
+> COMPLETO**: cronograma, asistencia, **seguimiento preventivo (3c)**, **participación integral**,
+> **alcance general (todos los proyectos)** + filtro por proyecto, y dashboards con Chart.js.
+> Ver secciones 11, 15 y 16. *(Aportes del equipo en master: comentarios/bitácora del cronograma,
+> avance de talleres por semana, modalidad presencial/virtual, ranking trimestral, calificaciones.)*
 
 ---
 
@@ -362,19 +360,22 @@ Cada ítem: icono, color (naranja=cita, índigo=charla), título, líneas y acci
   `php artisan storage:link`, `php artisan optimize:clear`.
 
 ### Estado actual
-- `master` (`origin`) contiene los **ítems 1–16**: cuestionarios/escalas, adjuntos, citas +
-  horarios, charlas, recordatorios, **pacientes + carga masiva**, **dashboard de progreso**,
-  **asignación masiva**, **alcance de citas por psicólogo** y **tema claro/oscuro (Sereno)** —
-  estos 5 últimos ya **mergeados vía PRs #16/#18/#20** (+ 2 merges directos).
-- **Pendiente: un solo PR consolidado** `release/consolidado-2026-07` (rama **subida a
-  `origin`**, base `master`) con los **ítems 17–24**. Se optó por **un PR** (no varios) porque
-  `integracion/local` **divergió** de `master` (arrastraba commits de tema-oscuro/perf que
-  master ya tenía por otra vía); consolidar evita conflictos/duplicados. El único conflicto
-  (`lang/en.json`) se resolvió conservando las claves de ambas ramas.
-- **`integracion/local`** (solo local): rama de integración continua donde se fue armando todo.
-  El PR consolidado se generó ramificando de `master` y fusionando `integracion/local`.
-- Al desplegar el PR: `composer install` (dompdf), `php artisan migrate`, `php artisan
-  storage:link`; escalas de ejemplo con `db:seed --class=CuestionarioBaiSeeder`/`...BdiSeeder`.
+- **`master` (`origin`) está al día con TODO lo de este documento** (nada pendiente de PR
+  por nuestra parte). Se mergearon, en orden:
+  1. **PR consolidado `release/consolidado-2026-07`** (#21): escalas BAI/BDI-II, interpretación/
+     matriz/export DASS-21, datos demográficos, Informe de Seguimiento (PDF), ficha/expediente,
+     permisos PACIENTES, gestor programa citas, imagen de charla. *(Antes, PRs #16/#18/#20:
+     pacientes, dashboard progreso, asignación masiva, alcance de citas, tema oscuro.)*
+  2. **PR `release/plan-gantt-2026-08`**: el **Plan/Gantt completo** — seguimiento 3c,
+     participación integral, alcance general + filtro, dashboards Chart.js (9 commits,
+     fast-forward; ver sección 16).
+- **`integracion/local`** (solo local, **NO se sube**): rama de integración continua. Tras el
+  merge quedó **igual a `origin/master`**. Los PRs se generan ramificando de `master` y
+  fusionando `integracion/local` (fast-forward cuando master no divergió).
+- **El equipo aporta en paralelo en `master`** (comentarios/bitácora del cronograma, avance de
+  talleres por semana, modalidad, ranking trimestral, calificaciones). Conviene **sincronizar
+  `integracion/local` con `origin/master`** antes de empezar cambios nuevos.
+- Al desplegar: `composer install` (dompdf), `php artisan migrate` (aditivas), `optimize:clear`.
 
 ### Repo de documentación
 - Este archivo `docs/CONTEXTO-PROYECTO.md` **no** se versiona en el repo del proyecto;
@@ -468,7 +469,7 @@ desactualizado en `ImportadorPacientes`.
 
 ---
 
-## 15. Informe Psicológico de Seguimiento *(PR consolidado)*
+## 15. Informe Psicológico de Seguimiento
 
 Documento clínico individual **por cita completada** (`informes_seguimiento`, 1:1 con la
 cita, `cita_id` unique). Nace del ciclo: *indicador detectado en un test → cita → informe →
@@ -493,26 +494,59 @@ recomendación → próxima cita*.
 
 ---
 
-## 16. Plan de trabajo — Cronograma tipo Gantt + Asistencia *(PR consolidado)*
+## 16. Plan de trabajo — Cronograma tipo Gantt (COMPLETO)
 
-Fase 3 del "Plan de Seguridad Integral" (del documento del cliente). Menú **"Plan de
-trabajo"**, permiso `planes.*` (Admin y Moderador).
+Fase 3 del "Plan de Seguridad Integral" (del documento/Excel del cliente). Menú **"Plan de
+trabajo"**, permiso `planes.*` (Admin y Moderador). **Todo el Excel está clonado y en `master`.**
 
-**3a — Cronograma/Gantt** (`planes` + `plan_actividades`, `PlanController`)
-- Plan **por proyecto** con `fecha_inicio/fin`; actividades por **bloque** (Propuesta ·
-  Data y análisis · Programa · Gestión y cierre), con `responsable`, `plazo_texto`,
-  `fecha_inicio/fin`, `estado` (`por_realizar|en_curso|realizada`), `avance %`.
-- **Grilla semanal** (13+ meses en columnas de semana agrupadas por mes): el **color de cada
-  celda se DERIVA** de fechas + estado (no se pinta a mano). Columna de actividad fija
-  (sticky) + scroll horizontal. `Plan::semanas()` y `PlanActividad::estadoEnSemana()`.
-- Alta/edición de actividad **inline** (`?editar=ID`); si vinculas una charla con fecha y no
-  indicas fechas, la actividad **hereda la fecha de la charla**.
+### Alcance del plan (general vs proyecto)
+- Un plan puede ser **General (todos los proyectos)** o **de un proyecto**: `planes.proyecto_id`
+  es **nullable** (null = general). Selector **"Alcance"** en el form (General por defecto).
+  `Plan::esGeneral()`. La idea del cliente: un **único plan general vigente por año/ciclo**;
+  los anteriores quedan como **histórico**. La lista infiere **Vigente/Histórico** por fechas
+  (`Plan::estaVigente()`), sin columnas extra.
+- **Filtro por proyecto** (`?proyecto=ID`) en cronograma/asistencia/seguimiento/participación
+  (como el dashboard de progreso): acota las **personas** al proyecto elegido; las actividades
+  del cronograma no cambian. Partial `planes/_filtro-proyecto`.
 
-**3b — Asistencia** (`PlanController::asistencia`, `planes.asistencia`)
-- Matriz **pacientes del proyecto × talleres** (actividades con `charla_id`), con marca de
-  asistencia (leída de `charla_user`) y **% de participación** por persona + totales.
-- La asistencia se **sigue registrando en cada Charla**; el plan solo la **consolida**.
+### 3a — Cronograma/Gantt (`planes` + `plan_actividades`)
+- Actividades por **bloque** (Propuesta · Data y análisis · Programa · Gestión y cierre), con
+  `responsable`, `plazo_texto`, `fecha_inicio/fin`, `estado`, `avance %`, `modalidad`.
+- **Grilla semanal** (lun–sáb, labels tipo `2.7`): color **derivado** de fechas + estado.
+  Columna sticky + scroll. `Plan::semanas()`, `PlanActividad::estadoEnSemana()`.
+- Herramientas del cronograma: **Avance de talleres** (gráfica), **Comentarios/bitácora** por
+  franja (aporte del equipo), semanas en **rojo** + nota, **avance de talleres por semana**
+  (días 0–5), **modalidad** presencial/virtual. El menú separa **herramientas** de las **vistas**
+  (Asistencia · Participación · Seguimiento en un grupo).
 
-**Pendiente (no construido):** 3c — Seguimiento por tipo de caso (conteo semanal, iniciales
-de apellido F/M/A/V) · 3d — Bitácora (comentarios narrativos por jornada). También queda el
-**Hub de Reportes** (lista global de informes) como cierre de la fase de reportes.
+### 3b — Asistencia (`asistencia`, `planes.asistencia`)
+- Matriz **pacientes × talleres** (actividades con `charla_id`), asistencia leída de `charla_user`,
+  con % por persona. Se registra en cada Charla; el plan **consolida**.
+
+### 3c — Seguimiento preventivo (`seguimiento`, `plan_seguimientos`)
+- Matriz **pacientes × semanas**: nº de **sesiones** (citas completadas) por semana. Se muestra
+  **dentro del cronograma** (bloque más) y en su vista propia. Nombre completo.
+- **Padrón confirmado** (tabla `plan_seguimientos`) con **sugerencias automáticas** según el
+  último indicador de test elevado (`IndicadorTest`) + alta/baja manual.
+- **% con sentido** (reemplaza el % por semanas del Excel, que era engañoso): con **meta** →
+  progreso hacia el alta (realizadas/meta) + estado **"Alta"**; sin meta → **adherencia**
+  (asistidas/agendadas); sin citas → "—". `plan_seguimientos.meta_sesiones` editable por paciente.
+- Gráfico **"% de seguimiento por persona"** (Chart.js, dentro de la vista).
+
+### Participación integral (`participacion`, `planes.participacion`)
+- Matriz **paciente × cada ítem** del programa (contenidos por tipo Video/Audio/Documento/Imagen/
+  Reunión + Charlas). **Participó = comentó el contenido o asistió a la charla** (misma regla
+  "contenido realizado = comentado" del dashboard). **% por grupo** + **% Promedio**.
+- **Dashboard** con 2 gráficos (Chart.js): **"% por ítem"** y **"% por semana"**.
+
+### 3d — Bitácora/Comentarios y Reconocimiento
+- **Aporte del equipo (ya en master):** comentarios/bitácora por franja del cronograma
+  (`plan_actividad_comentarios`, `plan_semanas`), y **ranking trimestral** de participación.
+
+> Nota técnica: los **gráficos Chart.js** van en un contenedor de **altura fija** (con
+> `maintainAspectRatio:false`, si el canvas no tiene contenedor con altura, crece sin parar).
+> Chart.js se carga por **CDN** (necesita internet para verse).
+
+**Pendiente / futuro:** **Hub de Reportes** (lista global de informes) como cierre de la fase de
+reportes; estados de asistencia más ricos (regular/reforzamiento/motivo de ausencia) si el cliente
+los pide.
