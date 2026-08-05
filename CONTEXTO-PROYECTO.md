@@ -8,7 +8,7 @@
 > PACIENTES**, **gestor programa citas**, imagen de referencia en charlas, y el **Plan de trabajo
 > tipo Gantt COMPLETO**: cronograma, asistencia, **seguimiento preventivo (3c)**, **participación
 > integral**, **alcance general** + filtro por proyecto, y dashboards con Chart.js.
-> **Pendiente de merge — PR `release/mejoras-y-deuda-2026-08`** (10 commits, ver sección 11):
+> **Mergeado a `master` (PR #29 `release/mejoras-y-deuda-2026-08`, 10 commits; ver sección 11):**
 > **Jitsi propio embebido** (iframe) con botón *Unirse*, **cronograma reactivo** (enfoque a la
 > semana actual, scroll preservado, marcar días por AJAX), **notificaciones por polling**, y la
 > **deuda técnica de más valor resuelta**: throttle de login + clave temporal configurable con
@@ -187,8 +187,8 @@ sección 16. Plan por **proyecto** con actividades por **bloque**; `plan_activid
 
 ## 6. Funcionalidades
 
-> Los ítems **1–24** están en `master`. Los **25–30** van en el PR
-> **`release/mejoras-y-deuda-2026-08`** (pendiente de merge; ver sección 11).
+> Los ítems **1–30** están en `master`. Los **25–30** llegaron en el PR #29
+> **`release/mejoras-y-deuda-2026-08`** (ver sección 11).
 
 1. **Login** Bootstrap split-screen + credenciales demo. Post-login: Usuario → feed;
    Moderador/Admin → dashboard.
@@ -398,14 +398,14 @@ Cada ítem: icono, color (naranja=cita, índigo=charla), título, líneas y acci
   escalas BAI/BDI-II, interpretación/matriz/export DASS-21, datos demográficos, Informe de
   Seguimiento (PDF), ficha/expediente, permisos PACIENTES, gestor programa citas, imagen de
   charla) → **PR `release/plan-gantt-2026-08`** (Plan/Gantt completo — seguimiento 3c,
-  participación, alcance general + filtro, dashboards).
-- **PENDIENTE DE MERGE — PR `release/mejoras-y-deuda-2026-08`** (subido a `origin`, 10 commits
-  lineales/fast-forward): Jitsi propio embebido + *Unirse*, cronograma reactivo (enfoque hoy,
-  scroll, AJAX), notificaciones por polling, throttle+clave temporal con cambio obligatorio,
-  `scopeDesde()` con índice + `APP_URL`, `ext-zip` + seeders demo separados, panel demo solo
-  fuera de producción, y **suite de tests con aislamiento de BD**. Abrir PR con el enlace
-  *compare* (`master` ← `release/mejoras-y-deuda-2026-08`).
-- **`integracion/local`** (solo local, **NO se sube**): rama de integración continua. Los PRs se
+  participación, alcance general + filtro, dashboards) → **PR #29 `release/mejoras-y-deuda-2026-08`**
+  (merge `80f7ce0`): Jitsi propio embebido + *Unirse*, cronograma reactivo (enfoque hoy, scroll,
+  AJAX), notificaciones por polling, throttle+clave temporal con cambio obligatorio, `scopeDesde()`
+  con índice + `APP_URL`, `ext-zip` + seeders demo separados, panel demo solo fuera de producción,
+  y **suite de tests con aislamiento de BD**.
+- **Nada pendiente de PR por nuestra parte:** `origin/master` está al día con todo este documento.
+- **`integracion/local`** (solo local, **NO se sube**): rama de integración continua, sincronizada
+  con `origin/master` tras el merge. Los PRs se
   generan ramificando de `integracion/local` a `release/*` y subiendo esa (fast-forward cuando
   `master` no divergió). El equipo aporta en paralelo en `master`; conviene **sincronizar
   `integracion/local` con `origin/master`** antes de empezar cambios nuevos.
