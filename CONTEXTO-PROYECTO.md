@@ -2,15 +2,21 @@
 
 > Documento de contexto autocontenido para entregar a otra IA / desarrollador.
 > Resume arquitectura, decisiones, funcionalidades y estado del repositorio.
-> Última actualización: agosto 2026. **Todo lo descrito está en `master`** (el equipo también
-> aporta en paralelo). Lo más reciente **mergeado a `master`**: **escalas BAI/BDI-II** +
-> interpretación/matriz/export del DASS-21, **datos demográficos** del paciente, **Informe
-> Psicológico de Seguimiento** (PDF), **ficha/expediente del paciente**, **permisos PACIENTES**,
-> **gestor programa citas**, imagen de referencia en charlas, y el **Plan de trabajo tipo Gantt
-> COMPLETO**: cronograma, asistencia, **seguimiento preventivo (3c)**, **participación integral**,
-> **alcance general (todos los proyectos)** + filtro por proyecto, y dashboards con Chart.js.
-> Ver secciones 11, 15 y 16. *(Aportes del equipo en master: comentarios/bitácora del cronograma,
-> avance de talleres por semana, modalidad presencial/virtual, ranking trimestral, calificaciones.)*
+> Última actualización: **5 de agosto de 2026**. Lo **mergeado a `master`** (PRs previos): **escalas
+> BAI/BDI-II** + interpretación/matriz/export del DASS-21, **datos demográficos** del paciente,
+> **Informe Psicológico de Seguimiento** (PDF), **ficha/expediente del paciente**, **permisos
+> PACIENTES**, **gestor programa citas**, imagen de referencia en charlas, y el **Plan de trabajo
+> tipo Gantt COMPLETO**: cronograma, asistencia, **seguimiento preventivo (3c)**, **participación
+> integral**, **alcance general** + filtro por proyecto, y dashboards con Chart.js.
+> **Pendiente de merge — PR `release/mejoras-y-deuda-2026-08`** (10 commits, ver sección 11):
+> **Jitsi propio embebido** (iframe) con botón *Unirse*, **cronograma reactivo** (enfoque a la
+> semana actual, scroll preservado, marcar días por AJAX), **notificaciones por polling**, y la
+> **deuda técnica de más valor resuelta**: throttle de login + clave temporal configurable con
+> cambio obligatorio, `Cita::scopeDesde()` con índice, `ext-zip` declarada, seeders demo y panel
+> de cuentas demo **solo fuera de producción**, y una **suite de tests** (login/throttle, RBAC,
+> scope de citas) con **aislamiento de BD blindado**.
+> *(Aportes del equipo en master: comentarios/bitácora del cronograma, avance de talleres por
+> semana, modalidad presencial/virtual, ranking trimestral, calificaciones.)*
 
 ---
 
@@ -44,8 +50,10 @@ Administrador, Moderador (psicólogo) y Usuario.
 | PDF | **barryvdh/laravel-dompdf** (Informe Psicológico de Seguimiento en PDF) |
 | Gráficos | **Chart.js 4** por CDN (diagramas radar de cuestionarios) |
 | Calendario | **flatpickr 4.6** por CDN (agendar cita: bloquea domingos y feriados) |
-| Videollamada | Enlaces **Jitsi** autogenerados (`https://meet.jit.si/SafePoint-Cita-…`) |
+| Videollamada | **Jitsi self-hosted** del cliente (`jitsi-meet.internationalsos-peru.com`, sin auth), sala autogenerada `SafePoint-…`. Config en `config/citas.php`. **Embebido** vía External API (`external_api.js` + `JitsiMeetExternalAPI`) en un modal, con *fallback* a nueva pestaña si el servidor bloquea el iframe |
+| Notificaciones | **Polling** (sin WebSockets/Reverb): `BROADCAST_CONNECTION=log`; la campanita consulta un endpoint cada N segundos (`RecordatoriosController`) |
 | Correo | `Mail::to()->send()` (confirmación de cita, best-effort en try/catch) |
+| Tests | **PHPUnit** contra **BD MySQL dedicada `psicologia_test`** (nunca la real); ver secciones 11 y 14 |
 | Frontend | **Bootstrap 5.3 + Bootstrap Icons por CDN** (sin build) |
 | Estilos propios | `public/css/corporate.css` (con cache-busting `?v=filemtime`) |
 | i18n | ES/EN con `__()` + `lang/en.json` |
@@ -179,8 +187,8 @@ sección 16. Plan por **proyecto** con actividades por **bloque**; `plan_activid
 
 ## 6. Funcionalidades
 
-> Los ítems **1–16** están en `master`. Los **17–24** van en el **PR consolidado
-> `release/consolidado-2026-07`** (pendiente de merge; ver secciones 11, 15 y 16).
+> Los ítems **1–24** están en `master`. Los **25–30** van en el PR
+> **`release/mejoras-y-deuda-2026-08`** (pendiente de merge; ver sección 11).
 
 1. **Login** Bootstrap split-screen + credenciales demo. Post-login: Usuario → feed;
    Moderador/Admin → dashboard.
@@ -230,13 +238,32 @@ sección 16. Plan por **proyecto** con actividades por **bloque**; `plan_activid
 22. **Recurso de permisos PACIENTES** *(PR consolidado)* — separado del staff; ver sección 4.
 23. **Gestor programa citas + enganche a informe** *(PR consolidado)* — sección 8.
 24. **Plan de trabajo (Gantt) + Asistencia** *(PR consolidado)* — sección 16.
+25. **Jitsi self-hosted embebido** *(PR 2026-08)* — sala en modal con External API +
+    botón **Unirse** en citas virtuales, **charlas** y **notificaciones**; fallback a
+    nueva pestaña. Config en `config/citas.php`. Ver sección 8/10.
+26. **Cronograma reactivo** *(PR 2026-08)* — al abrir **enfoca la semana actual**;
+    marcar días de avance por **AJAX** sin recargar (scroll preservado).
+27. **Notificaciones por polling** *(PR 2026-08)* — la campanita se refresca sola sin
+    recargar la página (sin WebSockets). Ver sección 10.
+28. **Seguridad de acceso** *(PR 2026-08)* — **throttle** de login (bloqueo tras 5
+    intentos) + **clave temporal configurable** (`.env`) con **cambio obligatorio** al
+    primer acceso (middleware `ForzarCambioClave`). **Cuentas demo ocultas en producción**.
+    Ver sección 14.
+29. **Rendimiento de citas** *(PR 2026-08)* — `Cita::scopeDesde()` compara por columnas
+    (usa índice), reemplaza `whereRaw CONCAT`. Ver sección 14.
+30. **Suite de tests + aislamiento de BD** *(PR 2026-08)* — PHPUnit sobre `psicologia_test`,
+    con `force` en `phpunit.xml` y una **red de seguridad** en `TestCase` que aborta si la
+    conexión no es de test. `ext-zip` declarada; seeders demo solo fuera de producción.
+    Ver secciones 11 y 14.
 
 ### Seeders (`DatabaseSeeder`, en orden)
 `RolSeeder`, `PermissionSeeder`, `UserSeeder`, `ModeradorSeeder`,
 `PsicologoDemoSeeder`, `HorarioDefectoSeeder`, `ProyectoSeeder`, `ContenidoDemoSeeder`,
 `CuestionarioDass21Seeder`, `CuestionarioBaiSeeder`, `CuestionarioBdiSeeder`,
-`CuestionarioNosacq50Seeder`, `Nosacq50RespuestasDemoSeeder`,
-`FeriadoSeeder`. (No hay `CharlaSeeder`: las charlas se crean desde la UI.)
+`CuestionarioNosacq50Seeder`, `FeriadoSeeder`. (No hay `CharlaSeeder`: las charlas se crean
+desde la UI.) **Separación producción/demo:** `DatabaseSeeder` corre siempre los seeders base
+(roles, permisos, admin, escalas, feriados) y **solo fuera de producción** los de **ejemplo**
+(`PsicologoDemoSeeder`, `ContenidoDemoSeeder`, `Nosacq50RespuestasDemoSeeder`).
 
 ### Usuarios demo (contraseña: `password`)
 | Email | Rol |
@@ -345,6 +372,12 @@ topbar (`<x-recordatorios-bell>`, visible en Feed / Contenidos / Mis cuestionari
 Cada ítem: icono, color (naranja=cita, índigo=charla), título, líneas y acciones
 (p. ej. *Unirse* si la cita virtual está por comenzar, *Ver mis citas*, *Ver en el feed*).
 
+> **Unirse embebido (Jitsi):** el botón *Unirse* aparece para **citas, charlas y reuniones**
+> virtuales cercanas a su hora, tanto en la campanita como en la franja del dashboard. Abre la
+> sala **dentro de un modal** (iframe con `JitsiMeetExternalAPI`), con *fallback* a nueva pestaña
+> si el servidor rechaza el iframe. Las charlas virtuales guardan su `enlace_reunion` (sala
+> `SafePoint-Charla-…`). Ver stack (sección 2) y `config/citas.php`.
+
 ---
 
 ## 11. Estado del repositorio y flujo de trabajo
@@ -360,22 +393,36 @@ Cada ítem: icono, color (naranja=cita, índigo=charla), título, líneas y acci
   `php artisan storage:link`, `php artisan optimize:clear`.
 
 ### Estado actual
-- **`master` (`origin`) está al día con TODO lo de este documento** (nada pendiente de PR
-  por nuestra parte). Se mergearon, en orden:
-  1. **PR consolidado `release/consolidado-2026-07`** (#21): escalas BAI/BDI-II, interpretación/
-     matriz/export DASS-21, datos demográficos, Informe de Seguimiento (PDF), ficha/expediente,
-     permisos PACIENTES, gestor programa citas, imagen de charla. *(Antes, PRs #16/#18/#20:
-     pacientes, dashboard progreso, asignación masiva, alcance de citas, tema oscuro.)*
-  2. **PR `release/plan-gantt-2026-08`**: el **Plan/Gantt completo** — seguimiento 3c,
-     participación integral, alcance general + filtro, dashboards Chart.js (9 commits,
-     fast-forward; ver sección 16).
-- **`integracion/local`** (solo local, **NO se sube**): rama de integración continua. Tras el
-  merge quedó **igual a `origin/master`**. Los PRs se generan ramificando de `master` y
-  fusionando `integracion/local` (fast-forward cuando master no divergió).
-- **El equipo aporta en paralelo en `master`** (comentarios/bitácora del cronograma, avance de
-  talleres por semana, modalidad, ranking trimestral, calificaciones). Conviene **sincronizar
+- **Mergeado a `master`** (en orden): PRs #16/#18/#20 (pacientes, dashboard progreso, asignación
+  masiva, alcance de citas, tema oscuro) → **PR consolidado `release/consolidado-2026-07`** (#21:
+  escalas BAI/BDI-II, interpretación/matriz/export DASS-21, datos demográficos, Informe de
+  Seguimiento (PDF), ficha/expediente, permisos PACIENTES, gestor programa citas, imagen de
+  charla) → **PR `release/plan-gantt-2026-08`** (Plan/Gantt completo — seguimiento 3c,
+  participación, alcance general + filtro, dashboards).
+- **PENDIENTE DE MERGE — PR `release/mejoras-y-deuda-2026-08`** (subido a `origin`, 10 commits
+  lineales/fast-forward): Jitsi propio embebido + *Unirse*, cronograma reactivo (enfoque hoy,
+  scroll, AJAX), notificaciones por polling, throttle+clave temporal con cambio obligatorio,
+  `scopeDesde()` con índice + `APP_URL`, `ext-zip` + seeders demo separados, panel demo solo
+  fuera de producción, y **suite de tests con aislamiento de BD**. Abrir PR con el enlace
+  *compare* (`master` ← `release/mejoras-y-deuda-2026-08`).
+- **`integracion/local`** (solo local, **NO se sube**): rama de integración continua. Los PRs se
+  generan ramificando de `integracion/local` a `release/*` y subiendo esa (fast-forward cuando
+  `master` no divergió). El equipo aporta en paralelo en `master`; conviene **sincronizar
   `integracion/local` con `origin/master`** antes de empezar cambios nuevos.
-- Al desplegar: `composer install` (dompdf), `php artisan migrate` (aditivas), `optimize:clear`.
+- Al desplegar: `composer install` (**nuevo `ext-zip`**), `php artisan migrate` (aditivas),
+  `php artisan optimize` (NO `optimize:clear` en prod: deja la app sin cachés → lenta).
+
+### Tests y seguridad de la BD (importante)
+- **`php artisan test`** corre PHPUnit contra **`psicologia_test`** (MySQL, no la real). Requiere
+  crearla una vez: `CREATE DATABASE psicologia_test`. Se usa MySQL y no SQLite porque el proyecto
+  tiene migraciones con SQL específico de MySQL (`ALTER … MODIFY … ENUM`).
+- **Doble candado anti-desastre** (tras un incidente en que un `migrate:fresh` dejó la BD real
+  vacía): `phpunit.xml` fija `DB_DATABASE=psicologia_test` con `force="true"` (sin `force`, como
+  `php artisan test` ya cargó `.env`, el override se ignoraba y `RefreshDatabase` podía tocar
+  `psicologia`); y `Tests\TestCase::refreshApplication()` **aborta la suite** si la conexión no
+  apunta a una BD de test, **antes** de cualquier `migrate:fresh`.
+- **Recomendación operativa:** respaldar antes de trabajos pesados —
+  `mysqldump -uroot psicologia > backup.sql`. No hay backups automáticos.
 
 ### Repo de documentación
 - Este archivo `docs/CONTEXTO-PROYECTO.md` **no** se versiona en el repo del proyecto;
@@ -435,21 +482,35 @@ inyección SQL ni XSS, seeders idempotentes, login sin enumeración de usuarios.
 nativo reemplazado por el **diálogo estilizado** (`data-confirm`) en el informe;
 **autoría del informe** restringida al **psicólogo tratante** (el Admin no redacta informes
 ajenos, solo lee/PDF) — mitiga parcialmente el punto de *alcance del Moderador*.
-**Sigue pendiente:** contraseña temporal fija + throttle de login, `whereRaw CONCAT`,
-login en claro, tests, `ext-zip` en `composer.json`, seeders demo en producción, y el
-*alcance clínico del Moderador* (aún ve la ficha de **todos** los pacientes).
+
+**Ya resuelto en el PR `release/mejoras-y-deuda-2026-08`** (ver secciones 6 y 11):
+- **Seguridad:** login con **throttle** (5 intentos → bloqueo, `RateLimiter`); **clave temporal
+  configurable** (`config/auth.php` ← `PASSWORD_TEMPORAL_PACIENTE`) con **cambio obligatorio** al
+  primer acceso (`debe_cambiar_password` + middleware `ForzarCambioClave` + `ClaveController`);
+  **cuentas demo del login ocultas en producción** (`@unless production`).
+- **Rendimiento:** `whereRaw CONCAT(fecha,' ',hora)` reemplazado por `Cita::scopeDesde()`
+  (comparación por columnas, usa índice) en los ~5 sitios; `APP_URL` corregido a la URL real.
+- **Calidad/infra:** **suite de tests** (login/throttle, RBAC, scope de citas, panel demo) con
+  **aislamiento de BD blindado**; `ext-zip` declarada en `composer.json`; **seeders demo
+  separados** de los de producción.
+
+**Sigue pendiente:** el **login sigue en claro** (sin tema oscuro); *alcance clínico del
+Moderador* (aún ve la ficha de **todos** los pacientes — decisión de producto); refactor
+`PacienteController`≈`UserController`; claves i18n huérfanas/duplicadas; token de sala Jitsi
+8→16 chars; `FeedController`/`DashboardProgresoController` materializan en PHP.
 
 **Prioridad alta**
-- **Seguridad:** contraseña temporal **hardcodeada** `'SafePoint123'` (igual para todos
-  los pacientes importados, se muestra en pantalla, sin forzar cambio) — `ImportadorPacientes`.
-  Y **login sin `throttle`** (fuerza bruta) — `routes/web.php`. Es la cadena más explotable.
-- **Rendimiento:** `whereRaw("CONCAT(fecha,' ',hora) >= ?")` (5 sitios) **anula los
-  índices** de `citas` → comparar por columnas. `FeedController` carga **todo** el feed
-  en memoria y pagina en PHP. `DashboardProgresoController` materializa todo en PHP.
+- ✅ **Seguridad (RESUELTO, PR 2026-08):** clave temporal ahora **configurable** con cambio
+  obligatorio; login con **throttle**. *(Antes: `'SafePoint123'` hardcodeada + login sin throttle,
+  la cadena más explotable.)*
+- **Rendimiento:** ✅ el `whereRaw CONCAT` (5 sitios) se reemplazó por `Cita::scopeDesde()`
+  (usa índice). **Sigue pendiente:** `FeedController` carga **todo** el feed en memoria y pagina
+  en PHP; `DashboardProgresoController` materializa todo en PHP.
 - **Frontend:** el **login queda en claro** (layout guest sin `data-bs-theme` + `bg-white`);
   `dashboard/progreso.blade.php` usa hex pastel fijos que rompen el modo oscuro.
-- **Calidad:** **sin tests reales** (solo `ExampleTest`); README genérico de Laravel;
-  `ext-zip` no declarada en `composer.json`; **seeders demo se ejecutan con los de producción**.
+- **Calidad:** ✅ **RESUELTO (PR 2026-08):** hay **suite de tests** (antes solo `ExampleTest`),
+  `ext-zip` declarada y **seeders demo separados** de producción. **Sigue pendiente:** README
+  genérico de Laravel; sin CI/PHPStan.
 
 **Prioridad media**
 - **Redundancia:** `PacienteController` ≈ `UserController` (CRUD casi idéntico);
