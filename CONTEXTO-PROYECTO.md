@@ -509,6 +509,15 @@ Cada ítem: icono, color (naranja=cita, índigo=charla), título, líneas y acci
 ### Repo de documentación
 - Este archivo `docs/CONTEXTO-PROYECTO.md` **no** se versiona en el repo del proyecto;
   vive en el git personal **`github.com/atestertesting/docs.git`**.
+- 🔒 **REGLA (obligatoria): `CONTEXTO-PROYECTO.md` NUNCA se elimina ni se oculta.** Por más que
+  se actualice/fusione con `master`, este archivo debe permanecer. Como `/docs` está en
+  `.gitignore`, ningún `git merge origin/master`, cambio de rama ni `checkout` del **repo
+  principal** lo toca (es un repo anidado, aparte). Si la carpeta local `docs/` llegara a faltar,
+  **re-clonarla** (`gh repo clone atestertesting/docs docs`) — no recrear el archivo desde cero,
+  para no perder el historial. Tras cualquier mejora/análisis, **actualizar este documento y
+  hacer `git push`** al repo de docs.
+- 🧭 **REGLA: las ideas, análisis y pendientes se registran en la sección 17
+  "Pendiente / futuro (backlog)".** Es el lugar único para lo que queda por hacer o proponer.
 
 ---
 
@@ -695,6 +704,42 @@ trabajo"**, permiso `planes.*` (Admin y Moderador). **Todo el Excel está clonad
 > `maintainAspectRatio:false`, si el canvas no tiene contenedor con altura, crece sin parar).
 > Chart.js se carga por **CDN** (necesita internet para verse).
 
-**Pendiente / futuro:** **Hub de Reportes** (lista global de informes) como cierre de la fase de
-reportes; estados de asistencia más ricos (regular/reforzamiento/motivo de ausencia) si el cliente
-los pide.
+**Pendiente / futuro (de este módulo):** **Hub de Reportes** (lista global de informes) como cierre
+de la fase de reportes; estados de asistencia más ricos (regular/reforzamiento/motivo de ausencia)
+si el cliente los pide.
+
+---
+
+## 17. Pendiente / futuro (backlog de ideas y análisis)
+
+> **Este es el lugar único para registrar lo que queda por hacer, ideas y análisis.** Cada vez que
+> se proponga una mejora o se haga un análisis, **anotarlo aquí** (y actualizar/subir este doc).
+> No borrar los ítems: al implementarse, marcarlos ✅ y mover un resumen a la sección que
+> corresponda (5/6/…).
+
+### Contenidos reutilizables + edición sin actualización "en vivo" ⭐ (pedido del cliente)
+- **Reutilizables:** un mismo **Contenido** debe poder **asignarse a varios Módulos** (hoy un
+  contenido pertenece a **un** módulo: `contenidos.modulo_id`). La idea es una relación
+  **muchos-a-muchos** (p. ej. pivote `contenido_modulo`) o un mecanismo de "copiar/enlazar"
+  contenido existente a otro módulo, para no recrearlo cada vez.
+- **Sin actualización en vivo al editar:** cuando un gestor **edita** un Contenido, el cambio
+  **NO** debe propagarse **en vivo** a las asignaciones ya hechas (para no alterar lo que un
+  paciente ya vio/respondió, ni el contenido ya asignado a un Módulo). Es decir, la edición debe
+  comportarse como una **versión/instantánea** por asignación (o pedir confirmación explícita de
+  "actualizar en todos los módulos"), en lugar de mutar el registro compartido en caliente.
+- **Notas de implementación:** cuidado con el tipo **Apartado** (las `ApartadoRespuesta` cuelgan
+  de `contenido_id`) y con "contenido realizado = comentado" (dashboards/participación); si un
+  contenido se comparte entre módulos hay que decidir si el avance/respuestas son por
+  (contenido) o por (contenido × módulo). *(Antecedente: hubo un intento de "reutilizar
+  contenido" que se **revirtió**; retomar con este diseño de no-live-update.)*
+
+### Otras ideas / pendientes en cola
+- **Búsqueda global de contenidos** — se retiró la búsqueda al consolidar módulos/contenidos
+  dentro de Proyectos; el cliente podría volver a pedirla más adelante.
+- **Integración Jitsi con JWT** — a la espera de que el cliente habilite JWT y entregue
+  `app_id`/`app_secret`; hoy la sala es sin auth.
+- **Alcance clínico del Moderador** — hoy un psicólogo ve datos de **todos** los pacientes;
+  revisar need-to-know por proyecto/asignación (decisión de producto).
+- **Login en modo oscuro** — el login sigue en claro (layout guest sin `data-bs-theme`).
+- **Rendimiento** — `FeedController` y `DashboardProgresoController` materializan en PHP; paginar
+  en BD. **Tooling** — sin CI/PHPStan; FormRequests en vez de validación inline.
