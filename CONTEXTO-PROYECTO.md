@@ -2,7 +2,30 @@
 
 > Documento de contexto autocontenido para entregar a otra IA / desarrollador.
 > Resume arquitectura, decisiones, funcionalidades y estado del repositorio.
-> Última actualización: **5 de agosto de 2026**. Lo **mergeado a `master`** (PRs previos): **escalas
+> Última actualización: **13 de agosto de 2026**.
+>
+> **Novedades (13-ago-2026):**
+> - **En 3 PRs abiertos** — mergear en orden `#36 → #37 → #38`, sin conflictos (probado):
+>   - **#36 `release/apartado-2026-08`** — nuevo tipo de contenido **"Apartado"**: consigna de
+>     texto libre + adjuntos mixtos (word/excel/pdf/imagen/video); es **interactivo**: cada
+>     paciente envía **su** respuesta (texto + adjuntos) y el gestor la revisa. En apartados se
+>     oculta la barra de comentarios del feed.
+>   - **#37 `release/experiencia-paciente-2026-08`** — **experiencia por rol** (el paciente
+>     *entra* al proyecto, no ve "Usuarios del proyecto", solo módulos publicados/contenidos
+>     vigentes; **menú por rol** vía `config/menu.php`, oculta Módulos/Contenidos del menú) +
+>     **rediseño "taller" en tarjetas** de Proyectos/Módulos/Contenidos (role-aware, responsive) +
+>     **reordenar drag-drop** integrado **sobre las tarjetas** (arrastrar el icono de la tarjeta).
+>   - **#38 `release/cuestionarios-2026-08`** — **cuestionarios pendientes en notificaciones** y
+>     el botón **"Volver"** de la revisión regresa a la **ficha del paciente**.
+> - **Aportes del equipo ya en `master`** (PRs #31–#35): **visor de imagen y de PDF tipo Facebook**
+>   en el feed (lightbox con comentarios al costado), **reordenar** módulos/contenidos con
+>   **arrastrar y soltar**, **Informe Psicológico con campos editables** (plantilla configurable),
+>   y el relabel del feed **"Mi respuesta / Responder"**.
+> - **Herramientas:** `gh` CLI **ya instalado** y autenticado (ver sección 11).
+>
+> ---
+>
+> Lo **mergeado a `master`** (PRs previos): **escalas
 > BAI/BDI-II** + interpretación/matriz/export del DASS-21, **datos demográficos** del paciente,
 > **Informe Psicológico de Seguimiento** (PDF), **ficha/expediente del paciente**, **permisos
 > PACIENTES**, **gestor programa citas**, imagen de referencia en charlas, y el **Plan de trabajo
@@ -54,7 +77,7 @@ Administrador, Moderador (psicólogo) y Usuario.
 | Notificaciones | **Polling** (sin WebSockets/Reverb): `BROADCAST_CONNECTION=log`; la campanita consulta un endpoint cada N segundos (`RecordatoriosController`) |
 | Correo | `Mail::to()->send()` (confirmación de cita, best-effort en try/catch) |
 | Tests | **PHPUnit** contra **BD MySQL dedicada `psicologia_test`** (nunca la real); ver secciones 11 y 14 |
-| Frontend | **Bootstrap 5.3 + Bootstrap Icons por CDN** (sin build) |
+| Frontend | **Bootstrap 5.3 + Bootstrap Icons por CDN** (sin build); **Alpine.js** (vía Livewire) para el visor tipo Facebook del feed; **SortableJS 1.15** por CDN para reordenar módulos/contenidos arrastrando |
 | Estilos propios | `public/css/corporate.css` (con cache-busting `?v=filemtime`) |
 | i18n | ES/EN con `__()` + `lang/en.json` |
 | Tooling | Pint (formato). Vite+Tailwind presentes pero **no usados** en las vistas |
@@ -127,10 +150,23 @@ Administrador, Moderador (psicólogo) y Usuario.
 - **Proyecto** → muchos **Módulos**; pivote `proyecto_user` (miembros del proyecto).
 - **ModuloEntrenamiento** (`modulos_entrenamiento`) → pertenece a Proyecto; `publicado`.
 - **Contenido** (`contenidos`) → pertenece a un Módulo. `tipo` (`video, documento,
-  imagen, reunion, evaluacion, audio`), `publicado`, `publicar_en` (programada).
+  imagen, reunion, evaluacion, audio, apartado`), `publicado`, `publicar_en` (programada),
+  `orden` (reordenable por drag-drop), `cuerpo` (consigna del apartado, nullable).
   `hasMany` → Video/Imagen/Documento/Audio; `hasOne` → Reunion/EvaluacionPsicologica.
+- **Contenido tipo `apartado`** (PR #36) — contenido **interactivo**: el gestor define una
+  **consigna** (`cuerpo`, texto libre) y adjuntos de referencia; cada paciente envía **su propia
+  respuesta**. Modelos: **`Adjunto`** (polimórfico-ligero: `contenido_id` + `respuesta_id`
+  nullable; `esImagen()`/`esVideo()`) y **`ApartadoRespuesta`** (`contenido_id`, `user_id`,
+  `texto`, con adjuntos). `Contenido->cuerpo/adjuntos()/respuestas()/respuestaDe($user)`.
+  `App\Services\GuardadorAdjuntos` guarda URLs **relativas** `/storage/...` (word/excel/pdf/
+  imagen/video, máx. 20 MB c/u). Rutas `apartado.responder` (POST) / `apartado.respuestas` (GET).
+- **Reordenar (drag-drop, aporte del equipo, PR #33)** — `Contenido::reordenar()` y
+  `ModuloEntrenamiento::reordenar()` reasignan `orden` de forma consecutiva desde la menor
+  posición del conjunto (respeta paginación); un no-gestor solo reordena lo de sus proyectos.
 - **Like** y **Comentario** → interacción del feed. **Comentario** ahora soporta
   **adjunto** (`adjunto_url`, `adjunto_nombre`; `cuerpo` nullable → permite adjunto solo).
+  En el feed la acción de comentar se muestra como **"Mi respuesta / Responder"** (relabel del
+  equipo); en contenidos tipo **apartado** esa barra se **oculta** (la interacción es la respuesta).
 
 **Alcance por proyecto:** feed y dashboard del Usuario se filtran por sus proyectos
 (`proyecto_user`). Admin/Moderador (`esGestor`) ven todo.
@@ -158,7 +194,11 @@ PhpSpreadsheet). Contraseña temporal por defecto (ver deuda técnica, sección 
 **Informe Psicológico de Seguimiento** (`informes_seguimiento`, 1:1 con una **cita
 completada**) — ver sección 15. Snapshot de identificación/firma + 8 secciones (I–VIII),
 `estado_informe` (`borrador|finalizado`). `Cita::informe()` y `Cita::admiteInforme()`
-(solo citas `completada`).
+(solo citas `completada`). **Campos editables (aporte del equipo, PR #34):** una **plantilla
+configurable** define los campos por defecto de cada informe nuevo — modelos **`CampoInforme`**
+(plantilla global: título, tipo `texto libre|opción múltiple|escala`, opciones, min/max) y
+**`SeccionInforme`** (campos concretos por informe); Livewire `GestionCamposInforme`
+(`informes.plantilla`) y `RedactarInforme`.
 
 **Plan de trabajo / Cronograma tipo Gantt** (`planes` + `plan_actividades`) — ver
 sección 16. Plan por **proyecto** con actividades por **bloque**; `plan_actividades.charla_id`
@@ -188,7 +228,8 @@ sección 16. Plan por **proyecto** con actividades por **bloque**; `plan_activid
 ## 6. Funcionalidades
 
 > Los ítems **1–30** están en `master`. Los **25–30** llegaron en el PR #29
-> **`release/mejoras-y-deuda-2026-08`** (ver sección 11).
+> **`release/mejoras-y-deuda-2026-08`**. Los **31–33** son aportes del **equipo** ya en `master`
+> (PRs #31–#35); los **34–36** están en **PRs abiertos nuestros** (#36/#37/#38). Ver sección 11.
 
 1. **Login** Bootstrap split-screen + credenciales demo. Post-login: Usuario → feed;
    Moderador/Admin → dashboard.
@@ -255,6 +296,27 @@ sección 16. Plan por **proyecto** con actividades por **bloque**; `plan_activid
     con `force` en `phpunit.xml` y una **red de seguridad** en `TestCase` que aborta si la
     conexión no es de test. `ext-zip` declarada; seeders demo solo fuera de producción.
     Ver secciones 11 y 14.
+31. **Visores tipo Facebook en el feed** *(equipo, PRs #31/#32 — en master)* — al hacer clic en
+    una **imagen** o un **PDF** del feed se abre un **lightbox** (imagen/iframe a la izquierda,
+    comentarios a la derecha) teletransportado al `<body>` con Alpine; relabel de comentar a
+    **"Mi respuesta / Responder"**.
+32. **Reordenar módulos y contenidos (drag-drop)** *(equipo, PR #33 — en master)* — arrastrar y
+    soltar con **SortableJS**, persiste por AJAX (`modulos.reordenar` / `contenidos.reordenar`).
+    En nuestro PR #37 se **integró sobre las tarjetas** del rediseño (se arrastra el icono).
+33. **Informe con campos editables** *(equipo, PR #34 — en master)* — plantilla configurable de
+    campos por defecto + edición por informe (ver secciones 5 y 15).
+34. **Contenido "Apartado" interactivo** *(nuestro, PR #36 abierto)* — consigna + adjuntos
+    mixtos; el paciente responde (texto + adjuntos), el gestor revisa; barra de comentarios
+    oculta en apartados. Ver sección 5.
+35. **Experiencia por rol + rediseño en tarjetas + reorder** *(nuestro, PR #37 abierto)* —
+    el paciente *entra* al proyecto (no gestiona, no ve "Usuarios del proyecto", solo lo
+    publicado/vigente, sin Estado); **menú por rol** desacoplado del acceso (`config/menu.php`,
+    oculta Módulos/Contenidos del menú, gestión desde Proyectos); **rediseño "taller"** en
+    tarjetas de Proyectos/Módulos/Contenidos (con barra de avance y chip "Hecho" para el
+    paciente); reordenar drag-drop **sobre las tarjetas** del gestor.
+36. **Cuestionarios: pendientes en notificaciones + "Volver" a la ficha** *(nuestro, PR #38
+    abierto)* — los cuestionarios pendientes aparecen en las notificaciones (acción Responder);
+    el botón "Volver" de la revisión regresa a la **ficha del paciente**, no al listado.
 
 ### Seeders (`DatabaseSeeder`, en orden)
 `RolSeeder`, `PermissionSeeder`, `UserSeeder`, `ModeradorSeeder`,
@@ -388,9 +450,18 @@ Cada ítem: icono, color (naranja=cita, índigo=charla), título, líneas y acci
 - **Integración continua local:** tras cada cambio, la rama se **fusiona en
   `integracion/local`** (creada desde `master`) para ver todo junto y resolver conflictos
   poco a poco. `integracion/local` **NO se sube** al remoto; es solo de revisión.
-- `gh` CLI **no** está instalado; los PRs se crean con el enlace de "compare".
-- Tras sincronizar: `composer install`, `php artisan migrate`,
-  `php artisan storage:link`, `php artisan optimize:clear`.
+- `gh` CLI **ya está instalado** (`C:\Program Files\GitHub CLI\gh.exe`, autenticado como
+  `atestertesting`, scopes `repo`/`workflow`; resuelve a `cristhian199228/proyecto_psicologia`).
+  Usar `gh pr create/list/view/merge`. *(Ojo: una terminal abierta antes de instalarlo tiene el
+  PATH viejo; invocar por ruta completa o abrir una nueva.)*
+- ⚠️ **La rama `master` local suele quedar desactualizada**: el master real es `origin/master`
+  y el **equipo mergea PRs a master en paralelo**. Basar ramas/PRs y calcular diffs **siempre
+  contra `origin/master`** (`git fetch origin master` primero). Traer periódicamente el trabajo
+  del equipo con `git merge origin/master` en `integracion/local`.
+- Tras sincronizar / un merge de master: `php artisan migrate`, `php artisan route:cache`
+  (el proyecto **cachea rutas** — sin esto, rutas nuevas dan "Route not defined"),
+  `php artisan storage:link`, `php artisan optimize:clear`. (`composer install`/`npm` solo si
+  cambiaron dependencias.)
 
 ### Estado actual
 - **Mergeado a `master`** (en orden): PRs #16/#18/#20 (pacientes, dashboard progreso, asignación
@@ -403,12 +474,23 @@ Cada ítem: icono, color (naranja=cita, índigo=charla), título, líneas y acci
   AJAX), notificaciones por polling, throttle+clave temporal con cambio obligatorio, `scopeDesde()`
   con índice + `APP_URL`, `ext-zip` + seeders demo separados, panel demo solo fuera de producción,
   y **suite de tests con aislamiento de BD**.
-- **Nada pendiente de PR por nuestra parte:** `origin/master` está al día con todo este documento.
-- **`integracion/local`** (solo local, **NO se sube**): rama de integración continua, sincronizada
-  con `origin/master` tras el merge. Los PRs se
-  generan ramificando de `integracion/local` a `release/*` y subiendo esa (fast-forward cuando
-  `master` no divergió). El equipo aporta en paralelo en `master`; conviene **sincronizar
-  `integracion/local` con `origin/master`** antes de empezar cambios nuevos.
+- **Aportes del equipo ya en `master`** (tras el PR #29): PRs **#31–#35** — visor de imagen y de
+  **PDF** tipo Facebook en el feed, **reordenar** módulos/contenidos (drag-drop), **informe con
+  campos editables** (plantilla), y el relabel **"Mi respuesta / Responder"**. `origin/master`
+  quedó en `90eb7ad`.
+- **PRs abiertos nuestros (13-ago-2026), mergear en orden `#36 → #37 → #38`** — reconstruidos
+  sobre el `origin/master` actual, los tres `mergeable = clean` y **sin conflictos** (probado con
+  merge secuencial `--no-ff`). Es una **pila lineal**: `master → #36 (apartado) → #37
+  (experiencia+reorder) → #38 (cuestionarios)`; cada PR muestra solo su diff y al mergear #36
+  GitHub reapunta #37 a master (y luego #38). Cadena de ramas: `release/apartado-2026-08` →
+  `release/experiencia-paciente-2026-08` → `release/cuestionarios-2026-08`.
+- **`integracion/local`** (solo local, **NO se sube**): ya tiene `git merge origin/master` con los
+  aportes del equipo **+** nuestro trabajo, todo integrado y probado (**45 tests en verde**). El
+  **conflicto de fondo** (nuestro rediseño en tarjetas **vs** el drag-drop del equipo en la
+  **tabla**) se resolvió **conservando ambos**: se mantienen las tarjetas y el reordenar se
+  **recableó sobre ellas** (se arrastra el icono). El tope de la pila de PRs es **byte-idéntico**
+  a `integracion/local`. Los PRs se generan ramificando de `integracion/local` a `release/*`.
+  Conviene **sincronizar `integracion/local` con `origin/master`** antes de empezar cambios nuevos.
 - Al desplegar: `composer install` (**nuevo `ext-zip`**), `php artisan migrate` (aditivas),
   `php artisan optimize` (NO `optimize:clear` en prod: deja la app sin cachés → lenta).
 
@@ -552,6 +634,11 @@ recomendación → próxima cita*.
   con el paciente precargado (`?paciente=ID`, tipo seguimiento).
 - **Accesos**: columna **Informe** en Gestión de citas (crear/continuar/ver según estado) y
   en la pestaña Informes de la ficha del paciente. `ocupacion` se precarga del `puesto`.
+- **Campos editables (aporte del equipo, PR #34 — en master)**: una **plantilla global**
+  (`informes.plantilla`, Livewire `GestionCamposInforme`) define los campos por defecto de cada
+  informe nuevo (tipo *texto libre / opción múltiple / escala*, con opciones o min/max); al
+  redactar (`RedactarInforme`) se pueden ajustar por informe. Modelos `CampoInforme` (plantilla)
+  y `SeccionInforme` (campos concretos del informe). Enlace en el menú **Agendamiento**.
 
 ---
 
