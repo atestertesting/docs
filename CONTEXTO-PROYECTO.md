@@ -757,9 +757,9 @@ por zona** (Costa 19, Sierra 38, Selva 40, San Isidro 179 → 276) para calcular
 **Instrumento:** 12 dimensiones psicosociales (CT, EM, DP, RC, CR, QL, CM, IT, TV, CJ, VU, VA) +
 **Salud mental GHQ-12**; ~76 ítems; **6 tipos de puntaje** (A directo 4→0, B protector 0→4, C
 vulnerabilidad 1→4, D violencia 0→4, P/N para GHQ). Cortes por dimensión (Bajo/Medio/Alto) en la
-hoja "Cortes". *(Ojo: la zona del cuestionario dice **OTP** = probablemente **San Isidro** del
-monitoreo — confirmar con el cliente. La satisfacción **TEA14** del baremo PDF no está en la hoja de
-autocalificación — confirmar si va.)*
+hoja "Cortes". *(**OTP = San Isidro** — confirmado por el cliente: es una sola zona; las zonas son
+Costa/Sierra/Selva/San Isidro con 19/38/40/179 = 276. La satisfacción **TEA14** del baremo PDF no
+está en la hoja de autocalificación — se dejó fuera por decisión del cliente.)*
 
 **Plan por fases:**
 1. **Datos:** `config/ceal.php` (dimensiones+cortes, tipos de puntaje, ítems) generado desde el xlsx.
