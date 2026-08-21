@@ -733,7 +733,15 @@ si el cliente los pide.
   (contenido) o por (contenido × módulo). *(Antecedente: hubo un intento de "reutilizar
   contenido" que se **revirtió**; retomar con este diseño de no-live-update.)*
 
-### CEAL-SM anónimo con link/QR (aprobado, en implementación) ⭐
+### CEAL-SM anónimo con link/QR (IMPLEMENTADO — rama `feat/ceal-anonimo`) ⭐
+> **Estado (2026-08-21): las 5 fases están hechas y mergeadas a `integracion/local` (58 tests verde).**
+> Falta abrir el PR. **Deploy:** requiere `composer install` (nueva dependencia
+> `bacon/bacon-qr-code`) y `php artisan migrate` (3 tablas nuevas). Menú "CEAL-SM (anónimo)"
+> (permiso `cuestionarios.crear`). Formulario público sin login en `/r/{token}`.
+> Pendiente/futuro del propio CEAL: afinar etiqueta GHQ "Mejor vs Más" por ítem; el ítem "AL"
+> (definición de bullying) entró como pregunta y debería ser solo texto; desglose de resultados
+> por zona/demográfico; export del monitoreo a Excel.
+
 Pedido del cliente (TGP): aplicar el **CEAL-SM / SUSESO** (riesgo psicosocial laboral) de forma
 **anónima**, generando **link + QR** (estilo Microsoft Forms) para que cualquiera responda sin login.
 Documentos fuente en `storage/docs/`: `CUESTIONARIO.pdf`, `CEAL-SM SUSESO Autocalificacion (2).xlsx`
