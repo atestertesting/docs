@@ -733,6 +733,39 @@ si el cliente los pide.
   (contenido) o por (contenido × módulo). *(Antecedente: hubo un intento de "reutilizar
   contenido" que se **revirtió**; retomar con este diseño de no-live-update.)*
 
+### CEAL-SM anónimo con link/QR (aprobado, en implementación) ⭐
+Pedido del cliente (TGP): aplicar el **CEAL-SM / SUSESO** (riesgo psicosocial laboral) de forma
+**anónima**, generando **link + QR** (estilo Microsoft Forms) para que cualquiera responda sin login.
+Documentos fuente en `storage/docs/`: `CUESTIONARIO.pdf`, `CEAL-SM SUSESO Autocalificacion (2).xlsx`
+(hojas Cuestionario/Puntajes/Cortes = ítems, tipos de puntaje y baremos), `BAREMOS…pdf`, y
+`SEGUIMIENTO TGP MONITOREO 2025.xlsx` (monitoreo de avance por zona).
+
+**Decisiones tomadas:** (1) por ahora **solo CEAL-SM** (no cuestionarios genéricos); (2) anti-duplicado
+por **cookie** (un envío por navegador, sin identificar) + rate-limit; (3) **QR server-side en SVG**
+(`bacon/bacon-qr-code`, sin `ext-gd`, imprimible/offline); (4) el "tamaño" es la **población objetivo
+por zona** (Costa 19, Sierra 38, Selva 40, San Isidro 179 → 276) para calcular **% de avance**;
+(5) campañas con **apertura y cierre** (+ cierre manual).
+
+**Instrumento:** 12 dimensiones psicosociales (CT, EM, DP, RC, CR, QL, CM, IT, TV, CJ, VU, VA) +
+**Salud mental GHQ-12**; ~76 ítems; **6 tipos de puntaje** (A directo 4→0, B protector 0→4, C
+vulnerabilidad 1→4, D violencia 0→4, P/N para GHQ). Cortes por dimensión (Bajo/Medio/Alto) en la
+hoja "Cortes". *(Ojo: la zona del cuestionario dice **OTP** = probablemente **San Isidro** del
+monitoreo — confirmar con el cliente. La satisfacción **TEA14** del baremo PDF no está en la hoja de
+autocalificación — confirmar si va.)*
+
+**Plan por fases:**
+1. **Datos:** `config/ceal.php` (dimensiones+cortes, tipos de puntaje, ítems) generado desde el xlsx.
+2. **Modelos/migraciones (tablas dedicadas, sin `user_id`):** `campanas_ceal` (token, activo,
+   abre_en/cierra_en, poblaciones por zona, creado_por), `respuestas_ceal` (zona + demográficos,
+   sin identidad), `respuesta_ceal_items` (código, valor, puntos).
+3. **Formulario público** sin auth (`/r/{token}` o `/r/{token}/{zona}`), layout limpio mobile-first,
+   cookie anti-duplicado + rate-limit + CSRF + honeypot.
+4. **QR + compartir** (SVG por zona, imprimible).
+5. **Dashboards del gestor:** (a) **monitoreo** realizadas/total/% por zona (= el Excel); (b)
+   **resultados** por dimensión con baremos, **solo agregados** (nunca individual).
+
+Rama: `feat/ceal-anonimo`.
+
 ### Otras ideas / pendientes en cola
 - **Búsqueda global de contenidos** — se retiró la búsqueda al consolidar módulos/contenidos
   dentro de Proyectos; el cliente podría volver a pedirla más adelante.
