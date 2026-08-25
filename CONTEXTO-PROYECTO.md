@@ -242,8 +242,10 @@ sección 16. Plan por **proyecto** con actividades por **bloque**; `plan_activid
 4. **Proyectos / Módulos / Contenidos** — CRUD, miembros, publicar, multimedia al
    storage, publicación programada (`publicar_en`), buscador.
 5. **Feed** estilo red social — contenido vigente + del alcance del usuario; **me
-   gusta**, **comentarios con adjuntos**, y **charlas** (finalizadas con foto =
-   registro; programadas = anuncio con ancla `#charla-ID`). Gestores ven todas las
+   gusta**, **comentarios con adjuntos** (con **foto de perfil** vía `<x-avatar>`), y
+   **charlas** (finalizadas con foto = registro; programadas = anuncio con ancla
+   `#charla-ID`). **Orden: por lo más reciente CREADO** (charlas y contenidos
+   entremezclados; ya no se fijan las charlas al inicio). Gestores ven todas las
    charlas con pie de gestión.
 6. **Usuarios / Roles y permisos** — tablas Livewire reactivas.
 7. **i18n ES/EN** — `SetLocale` (usuario > sesión > default); textos con `__()`.
@@ -369,6 +371,18 @@ tabla de niveles. `App\Services\ResultadosCuestionario` agrega la media por dime
 **Añadir escala:** `Cuestionario` con ese `tipo` + entrada en
 `config/cuestionarios.php` + seeder de preguntas etiquetadas por `dimension`/`invertida`.
 
+**Campañas anónimas de cuestionario (link/QR) — NUEVO 2026-08-24:** un cuestionario clínico puede
+responderse de forma **anónima por campaña** (enlace/QR, sin login), **reutilizando su motor de
+calificación**. Tablas dedicadas `campanas_cuestionario` / `respuestas_campana` /
+`respuesta_campana_items`; público `RespuestaCampanaController` (`/rc/{token}`), gestor
+`CampanaCuestionarioController` (`campanas.*`) con QR (bacon), **% de avance por zona** y
+**resultados** (radar + split Trabajadores/Directivos + matriz + Excel, **filtrados por campaña**).
+El cálculo reutiliza `CalificadorCuestionario` vía una **asignación transitoria** (no persistida:
+`setRelation('respuestas', …)`) — servicios `ResultadosCampana` / `MatrizCampana`. **NOSACQ-50 es
+"solo anónimo"** (flag `solo_anonimo` en `config/cuestionarios.php`): fuera de la tabla clínica y de
+"Mis cuestionarios"; se lista en la sección **"Cuestionarios anónimos"** junto al CEAL-SM. **Deploy:**
+`php artisan migrate` (3 tablas nuevas).
+
 ---
 
 ## 8. Módulo de Citas psicológicas + horarios
@@ -400,6 +414,17 @@ botón **"Programar próxima sesión"** del informe; ver sección 15).
 ---
 
 ## 9. Módulo de Charlas
+
+> **NUEVO (2026-08-24): las Charlas viven DENTRO de Contenidos** (son un tipo de contenido).
+> Se crean desde el formulario de contenido eligiendo tipo **"Charla"** (no hay creación suelta; se
+> retiraron `charlas.create/store`, su vista y el ítem "Charlas" del menú lateral). Al crear quedan
+> **ligadas al proyecto y módulo** del módulo elegido (`charlas.proyecto_id` / `charlas.modulo_id`) y
+> se **auto-inscriben los pacientes** (rol Usuario) de ese proyecto como asistentes; botón
+> **"Sincronizar con el proyecto"** (en `GestionCharla`) para sumar a quien se agregue después.
+> Aparecen en la **página del módulo** (junto a los contenidos, sin entrar al reordenado) y en la
+> sección **"Charlas"** del índice de Contenidos. `App\Services\CharlaService` centraliza
+> creación/imagen/Jitsi/inscripción (lo usan `ContenidoController@store` y `CharlaController@update`).
+> No hubo fusión de datos: el motor de charlas (asistencia/feed/recordatorios/Jitsi/Plan) queda intacto.
 
 - CRUD de charlas + **asistencia** (`charla_user.asistio`) vía Livewire
   `App\Livewire\GestionCharla` en `/charlas/{id}` (`charlas.show`).
@@ -734,10 +759,12 @@ si el cliente los pide.
   contenido" que se **revirtió**; retomar con este diseño de no-live-update.)*
 
 ### CEAL-SM anónimo con link/QR (IMPLEMENTADO — rama `feat/ceal-anonimo`) ⭐
-> **Estado (2026-08-21): las 5 fases están hechas y mergeadas a `integracion/local` (58 tests verde).**
-> Falta abrir el PR. **Deploy:** requiere `composer install` (nueva dependencia
-> `bacon/bacon-qr-code`) y `php artisan migrate` (3 tablas nuevas). Menú "CEAL-SM (anónimo)"
-> (permiso `cuestionarios.crear`). Formulario público sin login en `/r/{token}`.
+> **Estado (2026-08-24): las 5 fases están hechas y mergeadas a `integracion/local`.** Entra en el
+> **PR consolidado** de esta tanda (CEAL anónimo + NOSACQ anónimo + Charlas en Contenidos).
+> **UI:** CEAL-SM vive **dentro de "Cuestionarios"** (sección "Cuestionarios anónimos", no en el
+> menú); breadcrumb `Panel / Cuestionarios / CEAL-SM (anónimo)`. **Deploy:** requiere
+> `composer install` (nueva dependencia `bacon/bacon-qr-code`) y `php artisan migrate` (3 tablas
+> nuevas). Formulario público sin login en `/r/{token}`.
 > Pendiente/futuro del propio CEAL: afinar etiqueta GHQ "Mejor vs Más" por ítem; el ítem "AL"
 > (definición de bullying) entró como pregunta y debería ser solo texto; desglose de resultados
 > por zona/demográfico; export del monitoreo a Excel.
@@ -774,7 +801,57 @@ está en la hoja de autocalificación — se dejó fuera por decisión del clien
 
 Rama: `feat/ceal-anonimo`.
 
+### NOSACQ-50 anónimo por campaña (IMPLEMENTADO — 2026-08-24) ⭐
+Cliente TGP: NOSACQ-50 (clima de seguridad) también anónimo por link/QR. Se **reutilizó el motor
+clínico** (config `nosacq50`, ítems en BD, `CalificadorCuestionario` con promedio + ítems inversos,
+radar + split Trabajadores/Directivos) en vez de portarlo al CEAL. Se añadió la **capa anónima**
+(campañas + responder público `/rc/{token}` + resultados por campaña) en **tablas separadas**
+(`campanas_cuestionario`/`respuestas_campana`/`respuesta_campana_items`) — ver sección 7. NOSACQ-50
+quedó **"solo anónimo"** (flag `solo_anonimo`, fuera del flujo por login), sin tocar BAI/BDI/DASS.
+*Pendiente/futuro:* re-sincronizar demográficos por campaña; desglose de resultados por zona.
+
+### Charlas dentro de Contenidos (IMPLEMENTADO — 2026-08-24) ⭐
+Las charlas pasan a ser un **tipo de contenido** (ver sección 9): se crean desde el formulario de
+contenido, quedan ligadas a proyecto+módulo, **auto-inscriben pacientes** y se **sincronizan**. Se
+mantuvo el **motor de charlas** intacto (asistencia/feed/recordatorios/Jitsi/Plan) — **no hubo
+fusión de datos**. *Pendiente/futuro:* al **eliminar** una charla desde el módulo hoy redirige al
+hub de Contenidos (no al módulo); las charlas antiguas sin proyecto quedan solo en la sección
+Charlas (no en un módulo); opción de **mezclar** charlas en la misma tabla de contenidos (hoy van en
+bloque aparte, fuera del reordenado).
+
+### Mi perfil + avatares (IMPLEMENTADO — 2026-08-25) ⭐
+Página **"Mi perfil"** (autoservicio, cualquier usuario): **foto de perfil** (`users.avatar`,
+`/storage/…`, borra la anterior al reemplazar; fallback a la inicial), **nombre** e **idioma**
+editables, y **cambiar contraseña** integrado (verifica la actual). Correo/rol/puesto/área de **solo
+lectura** (los gestiona el gestor; alimentan reportes). Componente reutilizable **`<x-avatar>`** (foto
+o inicial) usado en topbar, comentarios (feed y plan), asistentes de charla, tablas de
+usuarios/pacientes, progreso y saludo del dashboard. `PerfilController` + rutas `perfil.*` bajo auth.
+**Deploy:** `php artisan migrate` (users.avatar) + `storage:link`. *(Los psicólogos usan su propio
+campo `Moderador.foto`, aún sin unificar con `users.avatar`.)*
+
+### Cuestionarios anónimos: asistente por pasos + autosave (IMPLEMENTADO — 2026-08-25) ⭐
+Los formularios públicos largos (CEAL `/r/{token}` y NOSACQ `/rc/{token}`) pasan a un **asistente por
+pasos** (uno por dimensión, barra de progreso, validación por paso; sigue siendo **un solo `<form>`**)
+y **autosave en `localStorage`** por token: si se cae el internet / cierra / refresca, **conserva
+respuestas y el paso** y ofrece "Empezar de nuevo"; el borrador se limpia en la página de gracias
+(registro confirmado). Todo front (partial `partials/wizard-cuestionario.blade.php`), sin backend.
+
+### Feed por recencia (IMPLEMENTADO — 2026-08-25)
+El feed pasó de "charlas fijas al inicio + contenidos en orden curricular" a un **hilo único ordenado
+por fecha de CREACIÓN** (lo último creado arriba, charlas y contenidos entremezclados).
+
+### Gestión de contenidos desde el módulo + navegación (IMPLEMENTADO — 2026-08-25)
+- Desde la página del **módulo**, el gestor **edita y publica/despublica** un contenido (incluidos
+  borradores) sin salir; el **título de un borrador** abre su edición.
+- **"Volver"** de un contenido (revisar) ya no queda en bucle tras guardar la respuesta del apartado
+  (va al módulo / Feed en vez de a sí mismo).
+- **Crear contenido**: "Volver"/"Cancelar" regresan al **módulo de origen** si vienes de él.
+
 ### Otras ideas / pendientes en cola
+- ✅ **Acceso a la gestión GLOBAL de Contenidos/Módulos — RESUELTO (2026-08-25):** se agregaron
+  botones **"Todos los contenidos"** y **"Todos los módulos"** en la página de **Proyectos** (con
+  **Volver** a Proyectos), manteniendo la regla del cliente (siguen ocultos del sidebar; no se tocó
+  `config/menu.php`).
 - **Búsqueda global de contenidos** — se retiró la búsqueda al consolidar módulos/contenidos
   dentro de Proyectos; el cliente podría volver a pedirla más adelante.
 - **Integración Jitsi con JWT** — a la espera de que el cliente habilite JWT y entregue
