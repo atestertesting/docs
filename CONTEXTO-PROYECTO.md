@@ -377,6 +377,14 @@ calificación**. Tablas dedicadas `campanas_cuestionario` / `respuestas_campana`
 `respuesta_campana_items`; público `RespuestaCampanaController` (`/rc/{token}`), gestor
 `CampanaCuestionarioController` (`campanas.*`) con QR (bacon), **% de avance por zona** y
 **resultados** (radar + split Trabajadores/Directivos + matriz + Excel, **filtrados por campaña**).
+**Resultados con filtros y descargas (2026-08-27):** los resultados agregados (CEAL y NOSACQ) se
+pueden **filtrar por zona y por demográficos** (re-agregación **en servidor**; en NOSACQ vía scope
+`RespuestaCampana::filtrado()` aplicado a `ResultadosCampana`/`MatrizCampana`) y **por dimensión**
+(multi-select client-side que reconstruye el/los gráfico(s) y oculta filas de la tabla). **Guardia de
+anonimato:** subgrupos con menos de `config('cuestionarios.min_subgrupo')` (=5) respuestas **no se
+muestran** (radar/tabla/matriz) y se fuerza n=0 para que ni un número del subgrupo llegue al HTML/JS.
+**Descargas PNG:** gráficos (canvas→PNG) y tablas (`html2canvas` con `onclone` para texto oscuro
+sobre fondo blanco). En CEAL, además, tabla a color (heatmap por nivel) y MFRPS filtrable por zona.
 El cálculo reutiliza `CalificadorCuestionario` vía una **asignación transitoria** (no persistida:
 `setRelation('respuestas', …)`) — servicios `ResultadosCampana` / `MatrizCampana`. **NOSACQ-50 es
 "solo anónimo"** (flag `solo_anonimo` en `config/cuestionarios.php`): fuera de la tabla clínica y de
@@ -516,6 +524,14 @@ Cada ítem: icono, color (naranja=cita, índigo=charla), título, líneas y acci
   **recableó sobre ellas** (se arrastra el icono). El tope de la pila de PRs es **byte-idéntico**
   a `integracion/local`. Los PRs se generan ramificando de `integracion/local` a `release/*`.
   Conviene **sincronizar `integracion/local` con `origin/master`** antes de empezar cambios nuevos.
+- **Tandas recientes en `master` (ago-2026):** **#40** (CEAL-SM + NOSACQ-50 anónimos + Charlas en
+  Contenidos) → **#41** (contenidos con período en el Plan/Gantt) → **#42** (mejoras UX: perfil con
+  foto, feed por recencia, wizard anónimo, navegación) → **#43** (perfil tipo Facebook, ranking con
+  foto, dark difuminado, login dark, flash auto-descartar, CEAL descargas/filtros/tabla color/MFRPS)
+  → **#44** (Livewire "por página" en módulos) → **#45** (cronograma PNG) → **#46** (filtro por
+  dimensión en CEAL + filtros/descargas PNG en NOSACQ). `origin/master` en `9c9aab4`;
+  `integracion/local` sincronizado y **1 commit por delante** (cache-bust del CSS por hash, sin
+  subir). Suite **128 tests Feature en verde**.
 - Al desplegar: `composer install` (**nuevo `ext-zip`**), `php artisan migrate` (aditivas),
   `php artisan optimize` (NO `optimize:clear` en prod: deja la app sin cachés → lenta).
 
@@ -847,6 +863,36 @@ por fecha de CREACIÓN** (lo último creado arriba, charlas y contenidos entreme
   (va al módulo / Feed en vez de a sí mismo).
 - **Crear contenido**: "Volver"/"Cancelar" regresan al **módulo de origen** si vienes de él.
 
+### Resultados anónimos: filtros + descargas PNG (IMPLEMENTADO — 2026-08-27) ⭐
+Sobre los resultados agregados de **CEAL** y **NOSACQ-50** (ver detalle técnico en §7):
+- **Filtros por zona y por demográficos** (re-agregan en servidor) con **guardia de anonimato**
+  (`cuestionarios.min_subgrupo`=5 / `ceal.min_subgrupo`=5): subgrupos chicos no muestran nada.
+- **Filtro por dimensión** (single y múltiple, client-side) que reconstruye gráficos y oculta filas.
+- **Descargas PNG** de gráficos (radar/barras vía canvas) y tablas (`html2canvas`). CEAL: tabla a
+  color + MFRPS filtrable por zona.
+- PRs: **#43** (CEAL descargas/filtros/tabla color/MFRPS + lote UX: perfil tipo Facebook, ranking con
+  foto, dark difuminado, login dark, flash auto-descartar), **#46** (filtro por dimensión en CEAL +
+  réplica completa en NOSACQ). Todo en `master`. Suite **128 tests en verde**.
+- *Nota UX pendiente:* al filtrar el radar de NOSACQ a **<3 dimensiones** degenera (un radar necesita
+  ≥3 ejes); se dejó habilitado, pero se podría cambiar a barras como en CEAL si se pide.
+
+### Aportes del equipo integrados (2026-08-27)
+Fusionados a `master` por el equipo y ya en `integracion/local`: **PR #44** ("por página" en vivo con
+Livewire en la lista de contenidos del módulo — `App\Livewire\ContenidosDelModulo`) y **PR #45**
+(descargar el cronograma/Gantt como **PNG**). También el trabajo previo (Jitsi con usuario del
+sistema, contenidos con período en el Plan/Gantt).
+
+### Deploy: cache-bust del CSS + método GitHub→servidor
+- **Cache-bust por hash (2026-08-27, en `integracion/local`, sin subir):** los layouts versionan
+  `corporate.css` por **`md5_file`** (hash de contenido) en vez de `filemtime`, porque el FTP suele
+  conservar el mtime y el navegador seguía sirviendo el CSS viejo tras un deploy.
+- ⚠️ **El método de despliegue GitHub→servidor NO está documentado** (sin CI/CD, sin `.cpanel.yml`,
+  sin script ni credenciales persistentes). Lo único verificable es el `git push` a GitHub. El
+  hosting es tipo **cPanel/FPM** (`public/.user.ini`). `public/` **sí** se versiona (solo se ignoran
+  `build/hot/storage`); `corporate.css` está en `master` (883 líneas). Un incidente típico: blade
+  nuevo + `corporate.css` viejo en el servidor porque la subida no refrescó `public/css/`. **Recomendado:**
+  apuntar el document root del dominio a la carpeta `public/` del proyecto y desplegar por `git pull`.
+
 ### Otras ideas / pendientes en cola
 - ✅ **Acceso a la gestión GLOBAL de Contenidos/Módulos — RESUELTO (2026-08-25):** se agregaron
   botones **"Todos los contenidos"** y **"Todos los módulos"** en la página de **Proyectos** (con
@@ -858,6 +904,7 @@ por fecha de CREACIÓN** (lo último creado arriba, charlas y contenidos entreme
   `app_id`/`app_secret`; hoy la sala es sin auth.
 - **Alcance clínico del Moderador** — hoy un psicólogo ve datos de **todos** los pacientes;
   revisar need-to-know por proyecto/asignación (decisión de producto).
-- **Login en modo oscuro** — el login sigue en claro (layout guest sin `data-bs-theme`).
+- ✅ **Login en modo oscuro — RESUELTO (PR #43):** el layout guest respeta el tema guardado
+  (`localStorage['safepoint-theme']` sin parpadeo) y el login tiene su propio toggle.
 - **Rendimiento** — `FeedController` y `DashboardProgresoController` materializan en PHP; paginar
   en BD. **Tooling** — sin CI/PHPStan; FormRequests en vez de validación inline.
