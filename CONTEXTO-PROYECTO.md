@@ -529,9 +529,10 @@ Cada ítem: icono, color (naranja=cita, índigo=charla), título, líneas y acci
   foto, feed por recencia, wizard anónimo, navegación) → **#43** (perfil tipo Facebook, ranking con
   foto, dark difuminado, login dark, flash auto-descartar, CEAL descargas/filtros/tabla color/MFRPS)
   → **#44** (Livewire "por página" en módulos) → **#45** (cronograma PNG) → **#46** (filtro por
-  dimensión en CEAL + filtros/descargas PNG en NOSACQ). `origin/master` en `9c9aab4`;
-  `integracion/local` sincronizado y **1 commit por delante** (cache-bust del CSS por hash, sin
-  subir). Suite **128 tests Feature en verde**.
+  dimensión en CEAL + filtros/descargas PNG en NOSACQ) → **#47** (2 fixes de seguridad + Feed
+  paginado en BD + eliminar proyecto/módulo/cuestionario + citas cancelar/reprogramar; ver §17).
+  `origin/master` en `8b341b2`; `integracion/local` **sincronizado 0/0**. Suite **151 tests Feature
+  en verde**.
 - Al desplegar: `composer install` (**nuevo `ext-zip`**), `php artisan migrate` (aditivas),
   `php artisan optimize` (NO `optimize:clear` en prod: deja la app sin cachés → lenta).
 
@@ -883,15 +884,60 @@ Livewire en la lista de contenidos del módulo — `App\Livewire\ContenidosDelMo
 sistema, contenidos con período en el Plan/Gantt).
 
 ### Deploy: cache-bust del CSS + método GitHub→servidor
-- **Cache-bust por hash (2026-08-27, en `integracion/local`, sin subir):** los layouts versionan
-  `corporate.css` por **`md5_file`** (hash de contenido) en vez de `filemtime`, porque el FTP suele
-  conservar el mtime y el navegador seguía sirviendo el CSS viejo tras un deploy.
+- **Cache-bust por hash (PR #47):** los layouts versionan `corporate.css` por **`md5_file`** (hash de
+  contenido) en vez de `filemtime`, porque el FTP suele conservar el mtime y el navegador seguía
+  sirviendo el CSS viejo tras un deploy.
+- **`.gitignore`:** se añadieron `/storage/docs` y `/public/.user.ini` (evita commitearlos por error).
 - ⚠️ **El método de despliegue GitHub→servidor NO está documentado** (sin CI/CD, sin `.cpanel.yml`,
   sin script ni credenciales persistentes). Lo único verificable es el `git push` a GitHub. El
   hosting es tipo **cPanel/FPM** (`public/.user.ini`). `public/` **sí** se versiona (solo se ignoran
   `build/hot/storage`); `corporate.css` está en `master` (883 líneas). Un incidente típico: blade
   nuevo + `corporate.css` viejo en el servidor porque la subida no refrescó `public/css/`. **Recomendado:**
   apuntar el document root del dominio a la carpeta `public/` del proyecto y desplegar por `git pull`.
+
+### Seguridad: hallazgos del pentest y fixes (PR #47 — 2026-08-28) ⭐
+Se analizó un **reporte de pentest (VAPT) de Astra** para *International SOS – Pasaporte Médico* (app
+DISTINTA de SafePoint, mismo cliente). Hallazgo #1: acceso indebido a PII de pacientes. Inspiró una
+**auditoría IDOR/broken-access-control en SafePoint** (la mayoría del sistema valida propiedad bien).
+Se corrigieron 2 cosas y quedó todo en `master`:
+- **Fuga del padrón de pacientes (citas, modo gestor):** `citas.admin.crear` y `AgendarCita` en modo
+  gestor se protegían con `citas.crear` — permiso que TAMBIÉN tiene el rol Usuario (autoservicio). Un
+  paciente podía abrir el modo gestor y enumerar nombre/email de **todos** los pacientes. Fix en dos
+  capas: la ruta pasa a `citas.editar` y el `mount` exige `esGestor()`.
+- **Adjuntos de paciente en disco privado:** las subidas de paciente (adjuntos de apartado/respuesta y
+  de comentarios) se servían por `/storage/...` sin auth (nombre aleatorio, pero accesible por URL).
+  Ahora viven en disco **privado** (`storage/app/private`) y se descargan por rutas autenticadas
+  (`AdjuntoController@descargar`, `ComentarioController@adjunto`) que validan propiedad (respuesta) o
+  visibilidad (contenido/comentario). Se sirven con `response()->file` (BinaryFileResponse → soporta
+  HTTP Range: imágenes/PDF embebidos y seek de video). Migración movió los archivos existentes y
+  reescribió URLs. Recursos educativos (video/doc) y avatares/charlas siguen en público.
+- **RBAC — dato clave:** el rol **Administrador es super-admin** (`Gate::before` en `AppServiceProvider`):
+  todo `@can`/`permission:` es `true` para él, así que sus toggles de permiso son **decorativos**. Para
+  restringir una acción a no-administradores se usa OTRO rol (p. ej. `cuestionarios.eliminar` se dejó
+  fuera del Moderador → solo el Admin borra cuestionarios).
+
+### Rendimiento: Feed paginado en la BD (PR #47 — 2026-08-28) ⭐
+`FeedController` materializaba TODOS los contenidos + charlas en PHP y paginaba con `forPage` (cargaba
+miles para mostrar 8). Ahora hace un **UNION** de `(id, created_at, tipo)` de ambas tablas, pagina con
+`LIMIT/OFFSET` **en la BD** e **hidrata solo los ~8 items** de la página. Escala O(perPage) en filas.
+*Pendiente:* `DashboardProgresoController` sigue materializando en PHP (paginar/precalcular cuando el
+nº de pacientes crezca).
+
+### Eliminar entidades con confirmación (PR #47 — 2026-08-28)
+Botones **Eliminar** con confirmación (`data-confirm` + `<dialog>`) y borrado en cascada (FKs
+`cascadeOnDelete`): **proyecto** (solo Admin), **módulo** (desde su propia página; ya existía desde el
+proyecto), **cuestionario/plantilla** (solo Admin; destructivo: arrastra preguntas/asignaciones/
+campañas). Cascada borra filas, no los archivos físicos de recursos (huérfanos, limpieza futura).
+
+### Citas: cancelar (con motivo) y reprogramar por el paciente (PR #47 — 2026-08-28)
+El paciente YA podía cancelar tras confirmar (regla de 24h, `citas.cancelacion_horas_min`); se mejoró:
+- **Cancelar** ahora pide **motivo** (col. `citas.motivo_cancelacion`) y **avisa por correo** al
+  psicólogo (`CitaCancelada`, best-effort). Cuando falta la ventana de 24h, se muestra un aviso
+  explicativo en vez de ocultar el botón sin más.
+- **Reprogramar** reusa el flujo de agendar (respeta disponibilidad); es **no destructivo**: la cita
+  original se cancela solo tras crear la nueva (`AgendarCita` con `reprogramarDe`).
+- *Nota deploy:* los correos de citas se envían **síncronos** (`Mail::send`); encolarlos (`->queue()` +
+  worker) está **parqueado** hasta confirmar que el servidor puede mantener un `queue:work`.
 
 ### Otras ideas / pendientes en cola
 - ✅ **Acceso a la gestión GLOBAL de Contenidos/Módulos — RESUELTO (2026-08-25):** se agregaron
@@ -906,5 +952,7 @@ sistema, contenidos con período en el Plan/Gantt).
   revisar need-to-know por proyecto/asignación (decisión de producto).
 - ✅ **Login en modo oscuro — RESUELTO (PR #43):** el layout guest respeta el tema guardado
   (`localStorage['safepoint-theme']` sin parpadeo) y el login tiene su propio toggle.
-- **Rendimiento** — `FeedController` y `DashboardProgresoController` materializan en PHP; paginar
-  en BD. **Tooling** — sin CI/PHPStan; FormRequests en vez de validación inline.
+- **Rendimiento** — ✅ Feed paginado en BD (PR #47); falta `DashboardProgresoController` (aún
+  materializa en PHP) y encolar los correos de citas. Overhead en LOCAL (Laragon): opcache apagado +
+  sesión/caché en BD; en prod usar opcache + `php artisan optimize`. **Tooling** — sin CI/PHPStan;
+  FormRequests en vez de validación inline.
