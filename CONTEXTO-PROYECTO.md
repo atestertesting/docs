@@ -530,9 +530,14 @@ Cada ítem: icono, color (naranja=cita, índigo=charla), título, líneas y acci
   foto, dark difuminado, login dark, flash auto-descartar, CEAL descargas/filtros/tabla color/MFRPS)
   → **#44** (Livewire "por página" en módulos) → **#45** (cronograma PNG) → **#46** (filtro por
   dimensión en CEAL + filtros/descargas PNG en NOSACQ) → **#47** (2 fixes de seguridad + Feed
-  paginado en BD + eliminar proyecto/módulo/cuestionario + citas cancelar/reprogramar; ver §17).
-  `origin/master` en `8b341b2`; `integracion/local` **sincronizado 0/0**. Suite **151 tests Feature
-  en verde**.
+  paginado en BD + eliminar proyecto/módulo/cuestionario + citas cancelar/reprogramar; ver §17)
+  → **#48** (fixes: descripción de proyecto OPCIONAL —columna `proyectos.descripcion` a nullable,
+  reventaba al crear sin descripción—; y el "Volver" del informe respeta el origen: desde la ficha
+  del paciente regresa a la ficha, no a Gestión de citas, con botón "Volver" contextual).
+  `origin/master` en `2bf35e4`; `integracion/local` **sincronizado 0/0**. Suite **155 tests Feature
+  en verde**. *Pendiente en cola (sin empezar): responsive móvil + barra de navegación inferior
+  tipo FB/IG (analizado: el reto es el menú grande por rol → 3-4 ítems + "Más"; y las ~35 vistas
+  con tablas anchas). Correos de citas síncronos (encolar cuando el servidor tenga worker).*
 - Al desplegar: `composer install` (**nuevo `ext-zip`**), `php artisan migrate` (aditivas),
   `php artisan optimize` (NO `optimize:clear` en prod: deja la app sin cachés → lenta).
 
