@@ -533,11 +533,13 @@ Cada ítem: icono, color (naranja=cita, índigo=charla), título, líneas y acci
   paginado en BD + eliminar proyecto/módulo/cuestionario + citas cancelar/reprogramar; ver §17)
   → **#48** (fixes: descripción de proyecto OPCIONAL —columna `proyectos.descripcion` a nullable,
   reventaba al crear sin descripción—; y el "Volver" del informe respeta el origen: desde la ficha
-  del paciente regresa a la ficha, no a Gestión de citas, con botón "Volver" contextual).
-  `origin/master` en `2bf35e4`; `integracion/local` **sincronizado 0/0**. Suite **155 tests Feature
-  en verde**. *Pendiente en cola (sin empezar): responsive móvil + barra de navegación inferior
-  tipo FB/IG (analizado: el reto es el menú grande por rol → 3-4 ítems + "Más"; y las ~35 vistas
-  con tablas anchas). Correos de citas síncronos (encolar cuando el servidor tenga worker).*
+  del paciente regresa a la ficha, no a Gestión de citas, con botón "Volver" contextual)
+  → **#49/#50** (comentarios de contenido en el Plan, en el modal) → **#51** (imagen del cronograma
+  con "Actividad" a la izquierda) → **#52** (UX móvil: navegación inferior + PWA + Panel rediseñado
+  + inicio por rol; ver §17). `origin/master` en `8d6b07d`; `integracion/local` **sincronizado 0/0**.
+  Suite **169 tests Feature en verde**. *Pendiente en cola: fase 2 del móvil (tablas anchas → tarjetas,
+  Gantt/gráficos); HTTPS en el servidor para instalar la PWA; correos de citas síncronos (encolar
+  cuando el servidor tenga worker).*
 - Al desplegar: `composer install` (**nuevo `ext-zip`**), `php artisan migrate` (aditivas),
   `php artisan optimize` (NO `optimize:clear` en prod: deja la app sin cachés → lenta).
 
@@ -943,6 +945,27 @@ El paciente YA podía cancelar tras confirmar (regla de 24h, `citas.cancelacion_
   original se cancela solo tras crear la nueva (`AgendarCita` con `reprogramarDe`).
 - *Nota deploy:* los correos de citas se envían **síncronos** (`Mail::send`); encolarlos (`->queue()` +
   worker) está **parqueado** hasta confirmar que el servidor puede mantener un `queue:work`.
+
+### UX móvil + PWA (IMPLEMENTADO — 2026-09-03, PR #52) ⭐
+Pedido del cliente: que en móvil se vea como app (menú tipo FB/IG abajo) e instalable.
+- **Navegación móvil** (<992px, desktop intacto): **barra inferior fija** por rol (4 accesos + ☰ Más,
+  con badge de cuestionarios pendientes en el paciente) y un **bottom-sheet** que sube (overlay oscuro
+  + arrastrar hacia abajo para cerrar) con el **menú completo por rol**. Se quitó la hamburguesa del
+  topbar en móvil. El menú se extrajo a `resources/views/partials/nav-menu.blade.php` y lo reusan el
+  sidebar (desktop) y el sheet (móvil) — misma lógica de permisos/roles. Barra del paciente:
+  Feed·Citas·Cuestionarios·Ranking; del gestor: Feed·Panel·Pacientes·Gestión de citas.
+- **PWA** (`public/manifest.webmanifest`, `public/sw.js`, `public/offline.html`, `public/icons/*`):
+  instalable, `display: standalone`, íconos corazón-pulso (192/512 + maskable), service worker
+  **conservador** (red primero; solo página offline en navegaciones sin conexión; NO cachea HTML
+  dinámico). Cabecera PWA (`partials/pwa-head`) en los layouts app y guest. **Requiere HTTPS en
+  producción** (en localhost sirve para probar; en `http://*.test` el SW no registra).
+- **Panel del paciente** rediseñado: tarjetas accionables (próxima cita / cuestionarios pendientes /
+  progreso) + acciones rápidas contextuales; hero estilo Facebook con la **foto de portada** del
+  usuario (misma `users.portada` de Mi perfil, SOLO LECTURA en el Panel; respaldo al índigo si no hay).
+- **Inicio por rol** (`User::rutaInicio()`): el paciente SIEMPRE arranca en el **Feed** (también desde
+  la URL raíz `/`); el gestor en el Panel.
+- *Pendiente (fase 2):* adaptar a móvil las ~35 vistas con tablas anchas (tarjetas apiladas), el Gantt
+  y los gráficos.
 
 ### Otras ideas / pendientes en cola
 - ✅ **Acceso a la gestión GLOBAL de Contenidos/Módulos — RESUELTO (2026-08-25):** se agregaron

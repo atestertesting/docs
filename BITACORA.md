@@ -2,8 +2,8 @@
 
 Registro cronológico de todo lo desarrollado y **fusionado a `master`**, desde el inicio hasta hoy.
 
-- **Rango:** 24-jun-2026 → 31-ago-2026 (~2 meses).
-- **Volumen:** **46 Pull Requests** fusionados (#1–#49; los nº faltantes se cerraron o consolidaron) · **346 commits** en `master`.
+- **Rango:** 24-jun-2026 → 3-sep-2026 (~2 meses y medio).
+- **Volumen:** **49 Pull Requests** fusionados (#1–#52; los nº faltantes se cerraron o consolidaron) en `master`.
 - **Fuentes:** historial de git + PRs de GitHub + `CONTEXTO-PROYECTO.md`.
 - **Flujo de trabajo:** ramas `feat/*` → se fusionan en `integracion/local` (rama local, no se sube) → se abren PRs desde ramas `release/*` sobre `master`. Regla: **NUNCA push directo a `master`**.
 - **Stack:** Laravel 13 · Livewire 4 · Blade · Bootstrap 5.3 (CDN) · Chart.js · MySQL. Sin React/Vue ni build de Vite para la UI.
@@ -59,11 +59,11 @@ Registro cronológico de todo lo desarrollado y **fusionado a `master`**, desde 
 - **#47** El paciente puede **cancelar** (con motivo + aviso al psicólogo) y **reprogramar** (no destructivo); aviso de la ventana de 24h.
 
 ### Plan de trabajo (cronograma tipo Gantt)
-- **#23 / #49** Comentarios por semana en el cronograma / en los contenidos del plan.
+- **#23 / #49 / #50** Comentarios por semana en el cronograma y por contenido (también en el modal).
 - **#26** Tipo de comentario (comentario / reporte).
 - **#27** Calificación por persona/contenido + ranking con empates.
 - **#28** Release Plan/Gantt (seguimiento, participación, alcance general + filtro, dashboards).
-- **#45** Descargar el cronograma como imagen PNG.
+- **#45 / #51** Descargar el cronograma como imagen PNG (con la columna "Actividad" a la izquierda).
 - **#41** Contenidos con período pintados como barras en el Gantt.
 
 ### Pacientes · Dashboard · Informe de seguimiento
@@ -80,6 +80,12 @@ Registro cronológico de todo lo desarrollado y **fusionado a `master`**, desde 
 ### UX y diseño
 - **#42** Perfil con foto, feed por recencia, navegación mejorada.
 - **#43** Perfil tipo Facebook (portada), ranking con foto, fondo difuminado en modo oscuro, login en modo oscuro.
+
+### Experiencia móvil y PWA (#52)
+- **Navegación móvil** (<992px): barra inferior fija por rol (4 accesos + ☰ Más, con badges) + **bottom-sheet** deslizable (overlay + arrastrar para cerrar) con el menú completo. Desktop intacto. Menú extraído a `partials/nav-menu` (reusado por sidebar y sheet).
+- **PWA instalable**: `manifest.webmanifest` (standalone, íconos 192/512 + maskable), service worker conservador (red primero + página offline), `apple-touch-icon`. *Requiere HTTPS en producción.*
+- **Panel del paciente** rediseñado (tarjetas accionables: próxima cita / cuestionarios / progreso) + hero con la **foto de portada** del usuario.
+- **Inicio por rol**: el paciente siempre arranca en el Feed (helper `User::rutaInicio()`), también desde `/`.
 
 ### Seguridad (auditoría inspirada en el pentest de Astra)
 - **#47** Fix de **fuga del padrón de pacientes** (citas modo gestor gate demasiado amplio) + **adjuntos de paciente en disco privado** con descarga autenticada.
@@ -145,6 +151,9 @@ Registro cronológico de todo lo desarrollado y **fusionado a `master`**, desde 
 | #47 | 2026-08-28 | Seguridad (padrón + adjuntos privados), Feed paginado en BD, gestión (eliminar + citas cancelar/reprogramar) |
 | #48 | 2026-08-31 | Fixes: crear proyecto sin descripción + navegación "Volver" del informe |
 | #49 | 2026-08-31 | Comentarios por semana en contenidos + volver al plan al editar |
+| #50 | 2026-09-02 | Plan: comentarios de contenido en el modal + fix filtro y orden |
+| #51 | 2026-09-02 | Plan: imagen del cronograma con la columna "Actividad" a la izquierda |
+| #52 | 2026-09-03 | UX móvil: navegación inferior + PWA instalable + Panel rediseñado + inicio por rol |
 
 ---
 
@@ -162,7 +171,7 @@ Al desplegar a producción (o al poner al día un entorno), lo aditivo/obligator
 
 ## 4. Pendientes en cola (no fusionados)
 
-- **Responsive móvil + barra de navegación inferior** (tipo FB/IG). Analizado: el reto es el menú grande y dependiente del rol (3-4 ítems + "Más") y las ~35 vistas con tablas anchas / Gantt / gráficos. Enfoque por fases (navegación primero, tablas después).
+- ✅ **Navegación móvil + PWA — HECHO (#52).** Pendiente la **fase 2**: adaptar a móvil las ~35 vistas con **tablas anchas** (tarjetas apiladas), el **Gantt** y los **gráficos**. Falta también **HTTPS en el servidor** para que la PWA sea instalable.
 - **Encolar los correos de citas** (`Mail::queue()` + worker `queue:work`), hoy son síncronos. Parqueado hasta confirmar que el servidor mantiene un worker.
 - **Paginar en BD** `DashboardProgresoController` (aún materializa en PHP) cuando crezca el nº de pacientes.
 - **Método de despliegue GitHub→servidor** no documentado (ver CONTEXTO): hosting cPanel/FPM; recomendado docroot en `public/` + `git pull`.
