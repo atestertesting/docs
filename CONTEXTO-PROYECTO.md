@@ -536,10 +536,18 @@ Cada ítem: icono, color (naranja=cita, índigo=charla), título, líneas y acci
   del paciente regresa a la ficha, no a Gestión de citas, con botón "Volver" contextual)
   → **#49/#50** (comentarios de contenido en el Plan, en el modal) → **#51** (imagen del cronograma
   con "Actividad" a la izquierda) → **#52** (UX móvil: navegación inferior + PWA + Panel rediseñado
-  + inicio por rol; ver §17). `origin/master` en `8d6b07d`; `integracion/local` **sincronizado 0/0**.
-  Suite **169 tests Feature en verde**. *Pendiente en cola: fase 2 del móvil (tablas anchas → tarjetas,
-  Gantt/gráficos); HTTPS en el servidor para instalar la PWA; correos de citas síncronos (encolar
-  cuando el servidor tenga worker).*
+  + inicio por rol; ver §17) → **#53** (forzar HTTPS en URLs cuando `APP_URL` es https; ver §17)
+  → **#54** (editar nombre/descripción de módulos, botón ✏️ en listado, ficha de proyecto y módulo)
+  → **#55** (fix: paciente sin proyecto veía 404 en Ranking → página amable; bottom-nav coherente)
+  → **#56–#59** (aportes del equipo: texto justificado en tarjetas, abrir imagen del apartado en el
+  visor, "Volver" del apartado a la página anterior, y **modo libre por contenido** —columna
+  `contenidos.es_libre`: comentarios públicos sin calificación ni ranking) → **#60** (filtros por
+  demográficos NUMÉRICOS —edad, N.º de hijos— por rango en Resultados de CEAL y NOSACQ; ver §17)
+  → **#61** (aporte del equipo: selector de tipo de gráfico en Resultados de CEAL, 7 vistas sin
+  recargar). `origin/master` en `5b7e7db`; `integracion/local` **sincronizado 0/0**.
+  Suite **181 tests Feature en verde**. *Pendiente en cola: fase 2 del móvil (tablas anchas → tarjetas,
+  Gantt/gráficos); correos de citas síncronos (encolar cuando el servidor tenga worker);
+  `DashboardProgresoController` aún materializa en PHP. **HTTPS ya en producción** (`safepoint.internationalsos-peru.com`).*
 - Al desplegar: `composer install` (**nuevo `ext-zip`**), `php artisan migrate` (aditivas),
   `php artisan optimize` (NO `optimize:clear` en prod: deja la app sin cachés → lenta).
 
@@ -966,6 +974,33 @@ Pedido del cliente: que en móvil se vea como app (menú tipo FB/IG abajo) e ins
   la URL raíz `/`); el gestor en el Panel.
 - *Pendiente (fase 2):* adaptar a móvil las ~35 vistas con tablas anchas (tarjetas apiladas), el Gantt
   y los gráficos.
+
+### Producción HTTPS + fixes de módulos/ranking (IMPLEMENTADO — 2026-09-09) ⭐
+La app pasó del servidor de pruebas HTTP (`10.10.10.29`) a **producción con HTTPS**
+(`safepoint.internationalsos-peru.com`). Tanda de correcciones a partir de pruebas del cliente:
+- **#53 — Forzar HTTPS** (`AppServiceProvider`): `URL::forceScheme('https')` **condicionado al esquema
+  de `APP_URL`** (no a `APP_ENV`), para no romper HTTP/local; se activa con `APP_URL=https://…`.
+  Evita contenido mixto y habilita instalar la PWA (requiere contexto seguro).
+- **#54 — Editar módulos:** antes solo se podía crear/publicar/eliminar; ahora `edit()`+`update()`
+  (permiso `modulos.editar`) editan **nombre y descripción**, con botón ✏️ en los 3 lugares (listado
+  global, ficha del proyecto, página del módulo). No se toca proyecto/orden/publicación.
+- **#55 — Ranking sin proyecto:** el paciente sin proyecto recibía `abort(404)`; ahora ve una **página
+  amable** ("Aún no perteneces a ningún proyecto") y el **bottom-nav** solo muestra "Ranking" si tiene
+  proyecto (si no, "Proyectos"), coherente con el sidebar.
+- *Nota de deploy (móvil):* como el `sw.js` cambió, en el dispositivo conviene **Unregister** del
+  service worker / "Clear site data" para no servir respuestas viejas desde caché.
+
+### Filtros por demográficos numéricos en Resultados (IMPLEMENTADO — 2026-09-09, PR #60) ⭐
+Los Resultados grupales anónimos solo filtraban por demográficos **categóricos** (género, estado civil,
+tiempo en la empresa, zona). Ahora también por los **numéricos** (edad, N.º de hijos) mediante **rangos**
+(dropdown), no valor exacto —los rangos también favorecen el anonimato.
+- **Rangos:** Edad → Hasta 25 · 26–35 · 36–45 · 46–55 · 56 o más; N.º de hijos → 0 · 1 · 2 · 3 o más;
+  otro numérico → tramos de 10.
+- **Paridad CEAL ↔ NOSACQ**: lógica de buckets en el **trait** `App\Support\RangosDemograficos`
+  (sin duplicar). En NOSACQ el rango se propaga por `RespuestaCampana::scopeFiltrado()` y los servicios
+  `ResultadosCampana`/`MatrizCampana`; en CEAL se aplica inline en la consulta.
+- Se conserva la **guardia de anonimato** (subgrupo < 5 → resultados ocultos) y el export (PNG/Excel).
+- El equipo sumó (#61) un **selector de tipo de gráfico** (7 vistas) en Resultados de CEAL, sin recargar.
 
 ### Otras ideas / pendientes en cola
 - ✅ **Acceso a la gestión GLOBAL de Contenidos/Módulos — RESUELTO (2026-08-25):** se agregaron

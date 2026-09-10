@@ -2,8 +2,8 @@
 
 Registro cronológico de todo lo desarrollado y **fusionado a `master`**, desde el inicio hasta hoy.
 
-- **Rango:** 24-jun-2026 → 3-sep-2026 (~2 meses y medio).
-- **Volumen:** **49 Pull Requests** fusionados (#1–#52; los nº faltantes se cerraron o consolidaron) en `master`.
+- **Rango:** 24-jun-2026 → 9-sep-2026 (~2 meses y medio).
+- **Volumen:** **58 Pull Requests** fusionados (#1–#61; los nº faltantes se cerraron o consolidaron) en `master`.
 - **Fuentes:** historial de git + PRs de GitHub + `CONTEXTO-PROYECTO.md`.
 - **Flujo de trabajo:** ramas `feat/*` → se fusionan en `integracion/local` (rama local, no se sube) → se abren PRs desde ramas `release/*` sobre `master`. Regla: **NUNCA push directo a `master`**.
 - **Stack:** Laravel 13 · Livewire 4 · Blade · Bootstrap 5.3 (CDN) · Chart.js · MySQL. Sin React/Vue ni build de Vite para la UI.
@@ -154,6 +154,15 @@ Registro cronológico de todo lo desarrollado y **fusionado a `master`**, desde 
 | #50 | 2026-09-02 | Plan: comentarios de contenido en el modal + fix filtro y orden |
 | #51 | 2026-09-02 | Plan: imagen del cronograma con la columna "Actividad" a la izquierda |
 | #52 | 2026-09-03 | UX móvil: navegación inferior + PWA instalable + Panel rediseñado + inicio por rol |
+| #53 | 2026-09-09 | Forzar HTTPS en las URLs cuando `APP_URL` es https (producción con SSL) |
+| #54 | 2026-09-09 | Editar módulos (nombre + descripción) con botón ✏️ en listado, proyecto y módulo |
+| #55 | 2026-09-09 | Fix: paciente sin proyecto veía 404 en Ranking → página amable + bottom-nav coherente |
+| #56 | 2026-09-08 | Feed: texto del cuerpo justificado en las tarjetas de contenido (equipo) |
+| #57 | 2026-09-08 | Feed: abrir la imagen adjunta del apartado en el visor ampliado (equipo) |
+| #58 | 2026-09-08 | Apartado: "Volver" regresa a la página anterior (feed/módulo) (equipo) |
+| #59 | 2026-09-08 | Modo libre por contenido (`es_libre`): comentarios públicos sin calificación ni ranking (equipo) |
+| #60 | 2026-09-09 | Resultados: filtros por demográficos numéricos (edad, N.º de hijos) por rango, CEAL + NOSACQ |
+| #61 | 2026-09-10 | Resultados CEAL: selector de tipo de gráfico (7 vistas, sin recargar) (equipo) |
 
 ---
 
@@ -171,10 +180,12 @@ Al desplegar a producción (o al poner al día un entorno), lo aditivo/obligator
 
 ## 4. Pendientes en cola (no fusionados)
 
-- ✅ **Navegación móvil + PWA — HECHO (#52).** Pendiente la **fase 2**: adaptar a móvil las ~35 vistas con **tablas anchas** (tarjetas apiladas), el **Gantt** y los **gráficos**. Falta también **HTTPS en el servidor** para que la PWA sea instalable.
+- ✅ **Navegación móvil + PWA — HECHO (#52).** ✅ **HTTPS en producción — HECHO (#53):** la app está
+  publicada en `safepoint.internationalsos-peru.com` con SSL, la PWA ya es instalable. Pendiente la
+  **fase 2** de móvil: adaptar las ~35 vistas con **tablas anchas** (tarjetas apiladas), el **Gantt** y los **gráficos**.
 - **Encolar los correos de citas** (`Mail::queue()` + worker `queue:work`), hoy son síncronos. Parqueado hasta confirmar que el servidor mantiene un worker.
 - **Paginar en BD** `DashboardProgresoController` (aún materializa en PHP) cuando crezca el nº de pacientes.
-- **Método de despliegue GitHub→servidor** no documentado (ver CONTEXTO): hosting cPanel/FPM; recomendado docroot en `public/` + `git pull`.
+- **Método de despliegue GitHub→servidor**: se despliega por **`git pull` en el servidor** (confirmado 2026-09); tras el pull, `php artisan migrate --force` (si hay migración) + `php artisan optimize`; en móvil, *Unregister* del service worker si cambió `sw.js`.
 
 ---
 
