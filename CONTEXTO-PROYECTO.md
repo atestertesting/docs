@@ -544,10 +544,20 @@ Cada ítem: icono, color (naranja=cita, índigo=charla), título, líneas y acci
   `contenidos.es_libre`: comentarios públicos sin calificación ni ranking) → **#60** (filtros por
   demográficos NUMÉRICOS —edad, N.º de hijos— por rango en Resultados de CEAL y NOSACQ; ver §17)
   → **#61** (aporte del equipo: selector de tipo de gráfico en Resultados de CEAL, 7 vistas sin
-  recargar). `origin/master` en `5b7e7db`; `integracion/local` **sincronizado 0/0**.
-  Suite **181 tests Feature en verde**. *Pendiente en cola: fase 2 del móvil (tablas anchas → tarjetas,
-  Gantt/gráficos); correos de citas síncronos (encolar cuando el servidor tenga worker);
-  `DashboardProgresoController` aún materializa en PHP. **HTTPS ya en producción** (`safepoint.internationalsos-peru.com`).*
+  recargar) → **#62** (CEAL: 4 gráficos de participación/demografía —Participantes, por género
+  —pictograma—, por sector —burbujas—, y "Riesgo por zona" del CT; ver §17) → **#63** (tabla de
+  detalle de Resultados adaptada al tema claro/oscuro: texto por variable, heatmap por opacidad,
+  cabecera azul completa) → **#64** ("Riesgo por zona" se muestra sin mínimo por zona) → **#65**
+  (descarga del gráfico en lienzo fijo tipo "cuadro" + texto de gráficos adaptable al tema con
+  re-dibujo + descarga en iPhone vía Web Share; y **réplica de la demografía a NOSACQ** con un
+  selector único que agrupa Diagramas radar + Participantes/género/sector + Resultados por
+  dimensión + Respuestas anónimas, radares con texto por tema; ver §17) → **#66** (CEAL: "Detalle
+  por dimensión" como opción del selector, gráfico/tabla se ven de a uno). `origin/master` en
+  `888ade0`; `integracion/local` **sincronizado 0/0**. Suite **184 tests Feature en verde**.
+  *Pendiente en cola: fase 2 del móvil (tablas anchas → tarjetas, Gantt/gráficos); correos de citas
+  síncronos (encolar cuando el servidor tenga worker); `DashboardProgresoController` aún materializa
+  en PHP; réplica opcional de "clima por zona" a NOSACQ. **HTTPS ya en producción**
+  (`safepoint.internationalsos-peru.com`).*
 - Al desplegar: `composer install` (**nuevo `ext-zip`**), `php artisan migrate` (aditivas),
   `php artisan optimize` (NO `optimize:clear` en prod: deja la app sin cachés → lenta).
 
@@ -1001,6 +1011,27 @@ tiempo en la empresa, zona). Ahora también por los **numéricos** (edad, N.º d
   `ResultadosCampana`/`MatrizCampana`; en CEAL se aplica inline en la consulta.
 - Se conserva la **guardia de anonimato** (subgrupo < 5 → resultados ocultos) y el export (PNG/Excel).
 - El equipo sumó (#61) un **selector de tipo de gráfico** (7 vistas) en Resultados de CEAL, sin recargar.
+
+### Gráficos de participación/demografía + selector único (IMPLEMENTADO — 2026-09-10/11, PR #62–#66) ⭐
+Ampliación de los Resultados grupales anónimos, inspirada en las láminas del cliente (SERMEDI /
+International SOS):
+- **Gráficos nuevos** (grupo "Participación y demografía"): **Participantes** (población objetivo vs.
+  respondieron, con % de participación), **Participantes por género** (pictograma, 1 ícono = 1 persona),
+  **Participantes por sector** (burbujas por zona) y, en CEAL, **Riesgo por zona** de Carga de trabajo
+  (barra por zona coloreada por banda, con escala; se muestra aunque el subgrupo sea chico, #64). El
+  conteo por género/sector y la participación se agregan en el controlador respetando filtros y anonimato.
+- **NOSACQ**: se replicó lo que aplica (participantes/género/sector) en un **partial reutilizable**
+  `resources/views/partials/graficos-demografia.blade.php`; NO se replicaron el selector de %-riesgo ni
+  las barras (su radar ya cumple). Ambos cuestionarios usan ahora **un selector único arriba** que
+  agrupa todas las vistas y muestra una a la vez (CEAL: gráficos + demografía + **Detalle por
+  dimensión** #66; NOSACQ: **Diagramas radar** por defecto + demografía + **Resultados por dimensión**
+  + **Respuestas anónimas**).
+- **Tema claro/oscuro**: texto de gráficos, radares y tablas adaptable (blanco en oscuro / negro en
+  claro) con re-dibujo al cambiar el tema; la tabla de detalle usa heatmap por opacidad y cabecera por tema.
+- **Descargas PNG**: gráfico a lienzo fijo tipo "cuadro" (no una tira larga) y **soporte iPhone** (iOS/
+  Safari/Chrome ignoran el atributo `download` → se usa `navigator.share` "Guardar imagen").
+- *Pendiente/idea:* un gráfico de **"clima por zona"** para NOSACQ (equivale al riesgo por zona de CEAL,
+  con la escala 1–4 y bandas propias) — requiere definir la métrica; queda opcional.
 
 ### Otras ideas / pendientes en cola
 - ✅ **Acceso a la gestión GLOBAL de Contenidos/Módulos — RESUELTO (2026-08-25):** se agregaron
