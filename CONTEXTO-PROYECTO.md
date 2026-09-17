@@ -552,8 +552,12 @@ Cada ítem: icono, color (naranja=cita, índigo=charla), título, líneas y acci
   re-dibujo + descarga en iPhone vía Web Share; y **réplica de la demografía a NOSACQ** con un
   selector único que agrupa Diagramas radar + Participantes/género/sector + Resultados por
   dimensión + Respuestas anónimas, radares con texto por tema; ver §17) → **#66** (CEAL: "Detalle
-  por dimensión" como opción del selector, gráfico/tabla se ven de a uno). `origin/master` en
-  `888ade0`; `integracion/local` **sincronizado 0/0**. Suite **184 tests Feature en verde**.
+  por dimensión" como opción del selector, gráfico/tabla se ven de a uno) → **#67** (fix: el service
+  worker de la PWA interceptaba/rompía la subida de archivos de Livewire —405/401—; ahora ignora
+  POST/otros orígenes/`/livewire/*` y solo actúa en navegaciones; caché `safepoint-v2`) → **#68**
+  (fix: `trustProxies(at:'*')` en `bootstrap/app.php` para detectar HTTPS tras el proxy → arregla el
+  **401** de la subida, porque la firma de la URL se generaba en https pero se validaba en http; ver §17).
+  `origin/master` en `5dc4368`; `integracion/local` **sincronizado 0/0**. Suite **184 tests Feature en verde**.
   *Pendiente en cola: fase 2 del móvil (tablas anchas → tarjetas, Gantt/gráficos); correos de citas
   síncronos (encolar cuando el servidor tenga worker); `DashboardProgresoController` aún materializa
   en PHP; réplica opcional de "clima por zona" a NOSACQ. **HTTPS ya en producción**
@@ -1032,6 +1036,32 @@ International SOS):
   Safari/Chrome ignoran el atributo `download` → se usa `navigator.share` "Guardar imagen").
 - *Pendiente/idea:* un gráfico de **"clima por zona"** para NOSACQ (equivale al riesgo por zona de CEAL,
   con la escala 1–4 y bandas propias) — requiere definir la métrica; queda opcional.
+
+### Fix de subida de archivos en producción (IMPLEMENTADO — 2026-09-14, PR #67–#68) ⭐
+La **carga masiva de pacientes** (y cualquier subida de Livewire) fallaba en producción con **405/401**.
+Dos causas encadenadas:
+- **Service worker (PWA):** una versión vieja del SW interceptaba el POST de subida (Initiator `sw.js`).
+  Fix (#67): el `fetch` handler ignora ahora métodos no-GET, otros orígenes y `/livewire/*`; solo actúa
+  en navegaciones GET; caché `safepoint-v2` con `skipWaiting`+`clients.claim`. Tras desplegar, en el
+  navegador conviene **Unregister** del SW una vez.
+- **HTTPS tras el proxy:** producción está detrás de un proxy que termina el TLS; Laravel veía la petición
+  como `http` y validaba la firma de la URL de subida en http, mientras se generaba en https (por el
+  forzado de HTTPS del #53) → **401**. Fix (#68): `$middleware->trustProxies(at: '*')` en `bootstrap/app.php`
+  (lee `X-Forwarded-Proto`). **Nota:** si aparecen otros problemas de esquema/redirecciones en prod, este
+  es el lugar (TrustProxies) a revisar.
+
+### i18n: interfaz vs. contenido (traducción) — análisis
+- La **interfaz** se traduce con `__()` + `lang/en.json`. Auditoría (2026-09-17): había ~337 claves usadas
+  sin traducción en inglés (quedaban en español, p. ej. "Adjuntar"). Se generó el en.json completo, pero
+  **el PR se cerró sin fusionar** (a pedido del cliente). El script de traducción quedó guardado; si se
+  retoma, regenerar y **confirmar antes de crear el PR**.
+- El **contenido/datos** (nombre de módulos, texto de apartados, preguntas, títulos de campañas, respuestas
+  de pacientes, comentarios…) se guarda en **una sola columna** (no hay `spatie/laravel-translatable` ni
+  columnas por idioma), así que **NO se traduce** al cambiar el idioma. Opciones si el cliente lo pide:
+  (1) dejarlo así; (2) **campos por idioma** solo donde importe (módulos/contenidos que ve el paciente) —
+  desarrollo mediano; (3) API de traducción (costo/calidad variable). El **traductor del navegador** ya
+  traduce todo (contenido incluido) porque la app no lo bloquea, pero **puede chocar con Livewire** (muta
+  el DOM) y dar glitches en pantallas muy interactivas.
 
 ### Otras ideas / pendientes en cola
 - ✅ **Acceso a la gestión GLOBAL de Contenidos/Módulos — RESUELTO (2026-08-25):** se agregaron

@@ -2,8 +2,8 @@
 
 Registro cronológico de todo lo desarrollado y **fusionado a `master`**, desde el inicio hasta hoy.
 
-- **Rango:** 24-jun-2026 → 11-sep-2026 (~2 meses y medio).
-- **Volumen:** **63 Pull Requests** fusionados (#1–#66; los nº faltantes se cerraron o consolidaron) en `master`.
+- **Rango:** 24-jun-2026 → 17-sep-2026 (~3 meses).
+- **Volumen:** **65 Pull Requests** fusionados (#1–#68; los nº faltantes se cerraron o consolidaron) en `master`.
 - **Fuentes:** historial de git + PRs de GitHub + `CONTEXTO-PROYECTO.md`.
 - **Flujo de trabajo:** ramas `feat/*` → se fusionan en `integracion/local` (rama local, no se sube) → se abren PRs desde ramas `release/*` sobre `master`. Regla: **NUNCA push directo a `master`**.
 - **Stack:** Laravel 13 · Livewire 4 · Blade · Bootstrap 5.3 (CDN) · Chart.js · MySQL. Sin React/Vue ni build de Vite para la UI.
@@ -168,6 +168,8 @@ Registro cronológico de todo lo desarrollado y **fusionado a `master`**, desde 
 | #64 | 2026-09-10 | "Riesgo por zona" se muestra sin mínimo por zona |
 | #65 | 2026-09-10 | Descarga en cuadro + texto por tema + iOS; réplica de demografía a NOSACQ (selector único) |
 | #66 | 2026-09-11 | CEAL: "Detalle por dimensión" como opción del selector de gráfico |
+| #67 | 2026-09-14 | Fix: el service worker (PWA) rompía la subida de archivos de Livewire (405/401) |
+| #68 | 2026-09-14 | Fix: TrustProxies para HTTPS tras el proxy → arregla el 401 de la subida de archivos |
 
 ---
 
